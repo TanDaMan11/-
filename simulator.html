@@ -1,0 +1,959 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trade Simulator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 24px;
+      padding: 40px;
+      max-width: 900px;
+      margin: 0 auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .icon-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 1.3rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 16px;
+      padding: 20px;
+      transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #2d3748;
+    }
+
+    .stat-card.highlight {
+      background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+    }
+
+    .chart-container {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+
+    canvas {
+      max-width: 100%;
+      height: 300px !important;
+    }
+
+    .controls {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 14px 32px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+    }
+
+    #buy {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      color: white;
+    }
+
+    #buy:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(17, 153, 142, 0.5);
+    }
+
+    #sell {
+      background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
+      color: white;
+    }
+
+    #sell:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(238, 9, 121, 0.5);
+    }
+
+    #tick {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      flex: 1 1 100%;
+    }
+
+    #tick:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    .time-indicator {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 15px;
+      font-weight: 500;
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      background: rgba(255, 106, 0, 0.95);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 2000;
+      max-width: 250px;
+      transition: top 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .toast.entering {
+      opacity: 0;
+      transform: translateX(100px);
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .toast.exiting {
+      opacity: 0;
+      transform: translateX(100px);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 24px;
+      padding: 50px;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .modal-stat {
+      font-size: 1.2rem;
+      margin: 15px 0;
+      color: #2d3748;
+    }
+
+    .modal-stat strong {
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .modal-stat.profit {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 25px 0;
+    }
+
+    .modal-stat.profit.positive {
+      color: #38ef7d;
+    }
+
+    .modal-stat.profit.negative {
+      color: #ff6a00;
+    }
+
+    .modal-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 48px;
+      font-size: 1.1rem;
+      margin-top: 20px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .modal-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+    }
+
+    .podium {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 10px;
+      margin-bottom: 30px;
+      height: 200px;
+    }
+
+    .podium-place {
+      flex: 1;
+      max-width: 120px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .podium-rank {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 5px;
+    }
+
+    .podium-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .podium-score {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .podium-base {
+      border-radius: 8px 8px 0 0;
+      padding: 15px 10px;
+    }
+
+    .podium-place.first .podium-base {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      height: 120px;
+    }
+
+    .podium-place.first .podium-rank {
+      color: #FFD700;
+    }
+
+    .podium-place.second {
+      order: -1;
+    }
+
+    .podium-place.second .podium-base {
+      background: linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 100%);
+      height: 90px;
+    }
+
+    .podium-place.second .podium-rank {
+      color: #C0C0C0;
+    }
+
+    .podium-place.third .podium-base {
+      background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
+      height: 70px;
+    }
+
+    .podium-place.third .podium-rank {
+      color: #CD7F32;
+    }
+
+    .leaderboard-list {
+      list-style: none;
+      margin-top: 20px;
+    }
+
+    .leaderboard-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 15px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      background: #f5f7fa;
+    }
+
+    .leaderboard-item.current-user {
+      background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+      border: 2px solid #667eea;
+    }
+
+    .leaderboard-item.gold {
+      background: linear-gradient(135deg, #FFD70020 0%, #FFA50020 100%);
+    }
+
+    .leaderboard-item.silver {
+      background: linear-gradient(135deg, #C0C0C020 0%, #A8A8A820 100%);
+    }
+
+    .leaderboard-item.bronze {
+      background: linear-gradient(135deg, #CD7F3220 0%, #B8733320 100%);
+    }
+
+    .leaderboard-rank {
+      font-weight: 700;
+      font-size: 1.1rem;
+      min-width: 40px;
+      color: #2d3748;
+    }
+
+    .leaderboard-name {
+      flex: 1;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .leaderboard-score {
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 8px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .form-error {
+      color: #ff6a00;
+      font-size: 0.85rem;
+      margin-top: 5px;
+    }
+
+    .current-username {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #f5f7fa;
+      border-radius: 8px;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .firebase-status {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      z-index: 3000;
+    }
+
+    .firebase-status.connected {
+      background: #38ef7d;
+      color: white;
+    }
+
+    .firebase-status.disconnected {
+      background: #ff6a00;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Trade Simulator</h1>
+      <div class="header-buttons">
+        <button class="icon-btn" id="leaderboardBtn" title="Leaderboard">🏆</button>
+        <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
+      </div>
+    </div>
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Cash</div>
+        <div class="stat-value">$<span id="cash">1000</span></div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Shares</div>
+        <div class="stat-value"><span id="shares">0</span></div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Market Price</div>
+        <div class="stat-value">$<span id="price">50</span></div>
+      </div>
+      
+      <div class="stat-card highlight">
+        <div class="stat-label">🏆 Highscore</div>
+        <div class="stat-value">$<span id="highscore">0</span></div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
+    </div>
+
+    <div class="controls">
+      <button id="buy">Buy 1</button>
+      <button id="sell">Sell 1</button>
+      <button id="tick">Next 30 Minutes</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="endDayModal">
+    <div class="modal-content">
+      <div class="modal-title">Day Ended</div>
+      <div>
+        <div class="modal-stat">Final Portfolio: <strong>$<span id="modalPortfolio">0</span></strong></div>
+        <div class="modal-stat profit" id="modalProfit">Profit/Loss: $0 (0%)</div>
+        <div class="modal-stat">Highscore: <strong>$<span id="modalHighscore">0</span></strong></div>
+      </div>
+      <button class="modal-btn" id="continueBtn">Continue Trading</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="leaderboardModal">
+    <div class="modal-content">
+      <div class="modal-title">🏆 Leaderboard</div>
+      <div class="podium" id="podium"></div>
+      <ul class="leaderboard-list" id="leaderboardList">
+        <li class="leaderboard-item">Loading...</li>
+      </ul>
+      <button class="modal-btn" id="closeLeaderboardBtn">Close</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-title">⚙️ Settings</div>
+      <div class="form-group">
+        <label class="form-label">Current Username</label>
+        <div class="current-username" id="currentUsername">Guest0000</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="usernameInput">Change Username</label>
+        <input type="text" id="usernameInput" class="form-input" placeholder="Enter new username" maxlength="20">
+        <div class="form-error" id="usernameError"></div>
+      </div>
+      <button class="modal-btn" id="saveUsernameBtn">Save Username</button>
+      <button class="modal-btn" id="closeSettingsBtn" style="background: #cbd5e0; color: #2d3748;       margin-left: 10px;">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAm-sSqxQ8PFO-k-h7VihWgoqNEyyCMOJY",
+      authDomain: "stock-game-1.firebaseapp.com",
+      projectId: "stock-game-1",
+      storageBucket: "stock-game-1.firebasestorage.app",
+      messagingSenderId: "267640665201",
+      appId: "1:267640665201:web:8c339b723ab4d5a5a157d0"
+    };
+
+    // Initialize Firebase
+    let db = null;
+    let firebaseReady = false;
+
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      firebaseReady = true;
+      console.log('✅ Firebase initialized successfully');
+    } catch (error) {
+      console.error('❌ Firebase error:', error);
+    }
+
+    // Game State
+    const INITIAL_CASH = 1000;
+    let cash = INITIAL_CASH;
+    let shares = 0;
+    let price = 50;
+    let highscore = parseFloat(localStorage.getItem('highscore') || '0');
+    let tickCount = 0;
+    let username = localStorage.getItem('username') || 'Guest' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    
+    if (!localStorage.getItem('username')) {
+      localStorage.setItem('username', username);
+    }
+
+    // DOM Elements
+    const els = {
+      cash: document.getElementById('cash'),
+      shares: document.getElementById('shares'),
+      price: document.getElementById('price'),
+      highscore: document.getElementById('highscore'),
+      currentUsername: document.getElementById('currentUsername'),
+      modalPortfolio: document.getElementById('modalPortfolio'),
+      modalProfit: document.getElementById('modalProfit'),
+      modalHighscore: document.getElementById('modalHighscore'),
+      usernameInput: document.getElementById('usernameInput'),
+      usernameError: document.getElementById('usernameError')
+    };
+
+    // Chart Setup
+    function getTimeLabels() {
+      const labels = [];
+      for (let i = 0; i <= 24; i++) {
+        const totalMinutes = 7 * 60 + i * 30;
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours > 12 ? hours - 12 : hours;
+        labels.push(`${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`);
+      }
+      return labels;
+    }
+    
+    const timeLabels = getTimeLabels();
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    const priceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [timeLabels[0]],
+        datasets: [{
+          label: 'Stock Price',
+          data: [price],
+          borderColor: '#667eea',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0,
+          pointRadius: 4,
+          pointBackgroundColor: '#667eea',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          segment: {
+            borderColor: ctx => {
+              const { p0, p1 } = ctx;
+              return p1.parsed.y >= p0.parsed.y ? '#38ef7d' : '#ff6a00';
+            }
+          }
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: { callback: v => '$' + v.toFixed(2) }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: ctx => 'Price: $' + ctx.parsed.y.toFixed(2) }
+          }
+        }
+      }
+    });
+
+    // Toast System
+    let toasts = [];
+
+    function updateToastPositions() {
+      toasts.forEach((toast, i) => toast.style.top = (20 + i * 70) + 'px');
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'toast entering';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      toasts.push(toast);
+      updateToastPositions();
+      
+      setTimeout(() => toast.classList.replace('entering', 'visible'), 10);
+      setTimeout(() => {
+        toast.classList.replace('visible', 'exiting');
+        setTimeout(() => {
+          const idx = toasts.indexOf(toast);
+          if (idx > -1) toasts.splice(idx, 1);
+          updateToastPositions();
+          if (document.body.contains(toast)) document.body.removeChild(toast);
+        }, 300);
+      }, 1500);
+    }
+
+    // Render
+    function render() {
+      els.cash.textContent = cash.toFixed(2);
+      els.shares.textContent = shares;
+      els.price.textContent = price.toFixed(2);
+      els.highscore.textContent = highscore.toFixed(2);
+      els.currentUsername.textContent = username;
+      priceChart.update();
+    }
+
+    // Game Actions
+    document.getElementById('buy').addEventListener('click', () => {
+      if (cash >= price) {
+        cash -= price;
+        shares += 1;
+        render();
+      } else {
+        showToast('Not enough cash!');
+      }
+    });
+
+    document.getElementById('sell').addEventListener('click', () => {
+      if (shares > 0) {
+        cash += price;
+        shares -= 1;
+        render();
+      } else {
+        showToast('No shares to sell!');
+      }
+    });
+
+    document.getElementById('tick').addEventListener('click', () => {
+      const change = (Math.random() - 0.5) * 4;
+      price = Math.max(0.1, price + change);
+      tickCount++;
+      priceChart.data.labels.push(timeLabels[tickCount]);
+      priceChart.data.datasets[0].data.push(price);
+
+      if (tickCount >= 24) {
+        const portfolio = cash + shares * price;
+        
+        if (portfolio > highscore) {
+          highscore = portfolio;
+          localStorage.setItem('highscore', highscore.toString());
+          
+          // Submit to Firebase
+          if (firebaseReady && db) {
+            db.collection('leaderboard').add({
+              username: username,
+              score: highscore,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+              console.log('✅ Score submitted to Firebase!');
+            }).catch(err => {
+              console.error('❌ Error submitting score:', err);
+            });
+          }
+        }
+
+        const profit = portfolio - INITIAL_CASH;
+        const profitPercent = ((profit / INITIAL_CASH) * 100).toFixed(2);
+        
+        els.modalPortfolio.textContent = portfolio.toFixed(2);
+        els.modalHighscore.textContent = highscore.toFixed(2);
+        els.modalProfit.className = 'modal-stat profit ' + (profit > 0 ? 'positive' : profit < 0 ? 'negative' : '');
+        els.modalProfit.textContent = `Profit/Loss: $${profit.toFixed(2)} (${profitPercent}%)`;
+        
+        document.getElementById('endDayModal').classList.add('active');
+      } else {
+        render();
+      }
+    });
+
+    document.getElementById('continueBtn').addEventListener('click', () => {
+      document.getElementById('endDayModal').classList.remove('active');
+      cash = INITIAL_CASH;
+      shares = 0;
+      price = 50;
+      tickCount = 0;
+      priceChart.data.labels = [timeLabels[0]];
+      priceChart.data.datasets[0].data = [price];
+      render();
+    });
+
+    // Leaderboard
+    async function loadLeaderboard() {
+      const list = document.getElementById('leaderboardList');
+      const podium = document.getElementById('podium');
+      
+      if (!firebaseReady || !db) {
+        list.innerHTML = '<li class="leaderboard-item">Firebase not connected</li>';
+        return;
+      }
+
+      try {
+        const snapshot = await db.collection('leaderboard')
+          .orderBy('score', 'desc')
+          .limit(100)
+          .get();
+        
+        const scores = [];
+        snapshot.forEach(doc => scores.push(doc.data()));
+
+        // Keep highest score per username
+        const userScores = {};
+        scores.forEach(entry => {
+          if (!userScores[entry.username] || entry.score > userScores[entry.username].score) {
+            userScores[entry.username] = entry;
+          }
+        });
+
+        const sorted = Object.values(userScores).sort((a, b) => b.score - a.score);
+        displayLeaderboard(sorted);
+      } catch (error) {
+        console.error('❌ Leaderboard error:', error);
+        list.innerHTML = '<li class="leaderboard-item">Error loading: ' + error.message + '</li>';
+      }
+    }
+
+    function displayLeaderboard(scores) {
+      const podium = document.getElementById('podium');
+      const list = document.getElementById('leaderboardList');
+      
+      podium.innerHTML = '';
+      list.innerHTML = '';
+
+      if (scores.length === 0) {
+        list.innerHTML = '<li class="leaderboard-item">No scores yet. Be the first!</li>';
+        return;
+      }
+
+      // Podium
+      const podiumData = [
+        { rank: 2, class: 'second', data: scores[1] },
+        { rank: 1, class: 'first', data: scores[0] },
+        { rank: 3, class: 'third', data: scores[2] }
+      ];
+
+      podiumData.forEach(({ rank, class: cls, data }) => {
+        if (data) {
+          const place = document.createElement('div');
+          place.className = `podium-place ${cls}`;
+          place.innerHTML = `
+            <div class="podium-rank">#${rank}</div>
+            <div class="podium-name">${data.username}</div>
+            <div class="podium-score">$${data.score.toFixed(2)}</div>
+            <div class="podium-base"></div>
+          `;
+          podium.appendChild(place);
+        }
+      });
+
+      // Top 10 List
+      const top10 = scores.slice(0, 10);
+      const userRank = scores.findIndex(s => s.username === username) + 1;
+
+      top10.forEach((entry, i) => {
+        const rank = i + 1;
+        const isCurrent = entry.username === username;
+        let cls = 'leaderboard-item';
+        
+        if (isCurrent) cls += ' current-user';
+        else if (rank === 1) cls += ' gold';
+        else if (rank === 2) cls += ' silver';
+        else if (rank === 3) cls += ' bronze';
+
+        const item = document.createElement('li');
+        item.className = cls;
+        item.innerHTML = `
+          <span class="leaderboard-rank">#${rank}</span>
+          <span class="leaderboard-name">${entry.username}</span>
+          <span class="leaderboard-score">${entry.score.toFixed(2)}</span>
+        `;
+        list.appendChild(item);
+      });
+
+      // Show user rank if outside top 10
+      if (userRank > 10 && userRank <= scores.length) {
+        const userEntry = scores[userRank - 1];
+        const item = document.createElement('li');
+        item.className = 'leaderboard-item current-user';
+        item.style.marginTop = '20px';
+        item.innerHTML = `
+          <span class="leaderboard-rank">#${userRank}</span>
+          <span class="leaderboard-name">${userEntry.username}</span>
+          <span class="leaderboard-score">${userEntry.score.toFixed(2)}</span>
+        `;
+        list.appendChild(item);
+      }
+    }
+
+    // Modal Controls
+    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+      document.getElementById('leaderboardModal').classList.add('active');
+      loadLeaderboard();
+    });
+
+    document.getElementById('closeLeaderboardBtn').addEventListener('click', () => {
+      document.getElementById('leaderboardModal').classList.remove('active');
+    });
+
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      document.getElementById('settingsModal').classList.add('active');
+      els.usernameInput.value = '';
+      els.usernameError.textContent = '';
+    });
+
+    document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+      document.getElementById('settingsModal').classList.remove('active');
+    });
+
+    document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
+      const newUsername = els.usernameInput.value.trim();
+      
+      if (!newUsername) {
+        els.usernameError.textContent = 'Username cannot be empty';
+        return;
+      }
+
+      if (newUsername.length < 3) {
+        els.usernameError.textContent = 'Username must be at least 3 characters';
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
+        els.usernameError.textContent = 'Only letters, numbers, and underscores allowed';
+        return;
+      }
+
+      // Check if username is taken
+      if (firebaseReady && db) {
+        try {
+          const snapshot = await db.collection('leaderboard')
+            .where('username', '==', newUsername)
+            .limit(1)
+            .get();
+          
+          if (!snapshot.empty && newUsername !== username) {
+            els.usernameError.textContent = 'Username already taken';
+            return;
+          }
+        } catch (error) {
+          console.error('Username check error:', error);
+        }
+      }
+
+      username = newUsername;
+      localStorage.setItem('username', username);
+      els.currentUsername.textContent = username;
+      document.getElementById('settingsModal').classList.remove('active');
+      showToast('Username updated!');
+    });
+
+    // Close modals on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+      modal.addEventListener('click', e => {
+        if (e.target === modal) modal.classList.remove('active');
+      });
+    });
+
+    // Initialize
+    render();
+    console.log('🎮 Game loaded! Username:', username);
+  </script>
+</body>
+</html>
