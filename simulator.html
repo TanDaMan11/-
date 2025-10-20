@@ -586,6 +586,7 @@
     let price = 50;
     let highscore = parseFloat(localStorage.getItem('highscore') || '0');
     let tickCount = 0;
+    let dayEnded = false;
     let username = localStorage.getItem('username') || 'Guest' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     
     if (!localStorage.getItem('username')) {
@@ -699,6 +700,14 @@
       els.highscore.textContent = highscore.toFixed(2);
       els.currentUsername.textContent = username;
       priceChart.update();
+      
+      // Update button text based on day status
+      const tickBtn = document.getElementById('tick');
+      if (dayEnded) {
+        tickBtn.textContent = 'End Day';
+      } else {
+        tickBtn.textContent = 'Next 30 Minutes';
+      }
     }
 
     // Game Actions
@@ -723,6 +732,12 @@
     });
 
     document.getElementById('tick').addEventListener('click', () => {
+      // If day has ended, just show the modal again
+      if (dayEnded) {
+        document.getElementById('endDayModal').classList.add('active');
+        return;
+      }
+
       const change = (Math.random() - 0.5) * 4;
       price = Math.max(0.1, price + change);
       tickCount++;
@@ -730,6 +745,7 @@
       priceChart.data.datasets[0].data.push(price);
 
       if (tickCount >= 24) {
+        dayEnded = true;
         const portfolio = cash + shares * price;
         
         if (portfolio > highscore) {
@@ -756,22 +772,32 @@
         els.modalPortfolio.textContent = portfolio.toFixed(2);
         els.modalHighscore.textContent = highscore.toFixed(2);
         els.modalProfit.className = 'modal-stat profit ' + (profit > 0 ? 'positive' : profit < 0 ? 'negative' : '');
-        els.modalProfit.textContent = `Profit/Loss: $${profit.toFixed(2)} (${profitPercent}%)`;
+        els.modalProfit.textContent = `Profit/Loss: ${profit.toFixed(2)} (${profitPercent}%)`;
+        
+        // Update button text in modal
+        document.getElementById('continueBtn').textContent = 'Start New Day';
         
         document.getElementById('endDayModal').classList.add('active');
-      } else {
-        render();
       }
+      
+      render();
     });
 
     document.getElementById('continueBtn').addEventListener('click', () => {
       document.getElementById('endDayModal').classList.remove('active');
+      
+      // Reset for new day
       cash = INITIAL_CASH;
       shares = 0;
       price = 50;
       tickCount = 0;
+      dayEnded = false;
       priceChart.data.labels = [timeLabels[0]];
       priceChart.data.datasets[0].data = [price];
+      
+      // Reset button text
+      document.getElementById('continueBtn').textContent = 'Continue Trading';
+      
       render();
     });
 
