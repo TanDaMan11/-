@@ -1,8 +1,6 @@
 <!doctype html>
 <html>
 <head>
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9247546865038453"
-     crossorigin="anonymous"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trade Simulator</title>
@@ -140,6 +138,16 @@
       text-transform: uppercase;
     }
 
+    #buyAll {
+      background: linear-gradient(135deg, #0d7377 0%, #14a085 100%);
+      color: white;
+    }
+
+    #buyAll:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(13, 115, 119, 0.5);
+    }
+
     #buy {
       background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
       color: white;
@@ -158,6 +166,16 @@
     #sell:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(238, 9, 121, 0.5);
+    }
+
+    #sellAll {
+      background: linear-gradient(135deg, #c31432 0%, #e03e52 100%);
+      color: white;
+    }
+
+    #sellAll:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(195, 20, 50, 0.5);
     }
 
     #tick {
@@ -229,12 +247,12 @@
     .modal-content {
       background: white;
       border-radius: 24px;
-      padding: 50px;
+      padding: 40px;
       max-width: 500px;
       width: 90%;
       text-align: center;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-      max-height: 80vh;
+      max-height: 85vh;
       overflow-y: auto;
     }
 
@@ -452,6 +470,85 @@
       color: #667eea;
     }
 
+    .settings-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .settings-menu-btn {
+      padding: 20px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e2e8f0 100%);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #2d3748;
+      text-transform: none;
+    }
+
+    .settings-menu-btn:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .settings-submenu {
+      display: none;
+    }
+
+    .settings-submenu.active {
+      display: block;
+    }
+
+    .color-scheme-btn {
+      padding: 15px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+      text-transform: none;
+    }
+
+    .color-scheme-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .color-scheme-btn.active {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    }
+
+    .color-scheme-btn.default {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .color-scheme-btn.cold {
+      background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+      color: white;
+    }
+
+    .color-scheme-btn.forest {
+      background: linear-gradient(135deg, #134e4a 0%, #059669 100%);
+      color: white;
+    }
+
+    .color-scheme-btn.sunset {
+      background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
+      color: white;
+    }
+
+    .color-scheme-btn.ocean {
+      background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
+      color: white;
+    }
+
     .firebase-status {
       position: fixed;
       bottom: 10px;
@@ -511,8 +608,10 @@
     </div>
 
     <div class="controls">
+      <button id="buyAll">Buy All</button>
       <button id="buy">Buy 1</button>
       <button id="sell">Sell 1</button>
+      <button id="sellAll">Sell All</button>
       <button id="tick">Next 30 Minutes</button>
     </div>
   </div>
@@ -713,6 +812,17 @@
     }
 
     // Game Actions
+    document.getElementById('buyAll').addEventListener('click', () => {
+      const canBuy = Math.floor(cash / price);
+      if (canBuy > 0) {
+        cash -= canBuy * price;
+        shares += canBuy;
+        render();
+      } else {
+        showToast('Not enough cash!');
+      }
+    });
+
     document.getElementById('buy').addEventListener('click', () => {
       if (cash >= price) {
         cash -= price;
@@ -727,6 +837,16 @@
       if (shares > 0) {
         cash += price;
         shares -= 1;
+        render();
+      } else {
+        showToast('No shares to sell!');
+      }
+    });
+
+    document.getElementById('sellAll').addEventListener('click', () => {
+      if (shares > 0) {
+        cash += shares * price;
+        shares = 0;
         render();
       } else {
         showToast('No shares to sell!');
@@ -928,6 +1048,29 @@
 
     document.getElementById('closeSettingsBtn').addEventListener('click', () => {
       document.getElementById('settingsModal').classList.remove('active');
+    });
+
+    // Color scheme buttons
+    document.querySelectorAll('.color-scheme-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.theme;
+        
+        // Remove all theme classes
+        document.body.classList.remove('cold', 'forest', 'sunset', 'ocean');
+        
+        // Add new theme if not default
+        if (theme !== 'default') {
+          document.body.classList.add(theme);
+        }
+        
+        // Update active state
+        document.querySelectorAll('.color-scheme-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Save theme
+        currentTheme = theme;
+        localStorage.setItem('theme', theme);
+      });
     });
 
     document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
