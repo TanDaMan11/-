@@ -689,6 +689,7 @@
     let tickCount = 0;
     let dayEnded = false;
     let username = localStorage.getItem('username') || 'Guest' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    let userDocId = localStorage.getItem('userDocId') || null; // Store the document ID
     
     if (!localStorage.getItem('username')) {
       localStorage.setItem('username', username);
@@ -874,17 +875,9 @@
           highscore = portfolio;
           localStorage.setItem('highscore', highscore.toString());
           
-          // Submit to Firebase
+          // Submit/Update to Firebase
           if (firebaseReady && db) {
-            db.collection('leaderboard').add({
-              username: username,
-              score: highscore,
-              timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(() => {
-              console.log('✅ Score submitted to Firebase!');
-            }).catch(err => {
-              console.error('❌ Error submitting score:', err);
-            });
+            submitOrUpdateScore(username, highscore);
           }
         }
 
@@ -924,6 +917,42 @@
     });
 
     // Leaderboard
+    async function submitOrUpdateScore(username, score) {
+      if (!firebaseReady || !db) return;
+
+      try {
+        // Check if user already has an entry
+        const snapshot = await db.collection('leaderboard')
+          .where('username', '==', username)
+          .limit(1)
+          .get();
+
+        if (!snapshot.empty) {
+          // Update existing entry
+          const doc = snapshot.docs[0];
+          await doc.ref.update({
+            score: score,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          userDocId = doc.id;
+          localStorage.setItem('userDocId', userDocId);
+          console.log('✅ Score updated in Firebase!');
+        } else {
+          // Create new entry
+          const docRef = await db.collection('leaderboard').add({
+            username: username,
+            score: score,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          userDocId = docRef.id;
+          localStorage.setItem('userDocId', userDocId);
+          console.log('✅ Score submitted to Firebase!');
+        }
+      } catch (error) {
+        console.error('❌ Error submitting/updating score:', error);
+      }
+    }
+
     async function loadLeaderboard() {
       const list = document.getElementById('leaderboardList');
       const podium = document.getElementById('podium');
@@ -1103,16 +1132,27 @@
             els.usernameError.textContent = 'Username already taken';
             return;
           }
+
+          // Update username in database if user has an entry
+          if (userDocId) {
+            await db.collection('leaderboard').doc(userDocId).update({
+              username: newUsername
+            });
+            console.log('✅ Username updated in Firebase!');
+          }
         } catch (error) {
           console.error('Username check error:', error);
         }
       }
 
+      const oldUsername = username;
       username = newUsername;
       localStorage.setItem('username', username);
       els.currentUsername.textContent = username;
       document.getElementById('settingsModal').classList.remove('active');
       showToast('Username updated!');
+      
+      console.log(`Username changed from ${oldUsername} to ${username}`);
     });
 
     // Close modals on overlay click
