@@ -1108,6 +1108,9 @@
     // Modal Controls
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
       document.getElementById('leaderboardModal').classList.add('active');
+      // Make sure leaderboard view is shown
+      document.getElementById('leaderboardView').classList.remove('hidden');
+      document.getElementById('profileView').classList.remove('active');
       loadLeaderboard();
     });
 
@@ -1123,6 +1126,40 @@
 
     document.getElementById('closeSettingsBtn').addEventListener('click', () => {
       document.getElementById('settingsModal').classList.remove('active');
+    });
+
+    // My Profile button in settings
+    document.getElementById('myProfileBtn').addEventListener('click', async () => {
+      document.getElementById('settingsModal').classList.remove('active');
+      document.getElementById('leaderboardModal').classList.add('active');
+      
+      // Load current user's data
+      if (firebaseReady && db) {
+        try {
+          const snapshot = await db.collection('leaderboard')
+            .where('username', '==', username)
+            .limit(1)
+            .get();
+          
+          if (!snapshot.empty) {
+            const userData = snapshot.docs[0].data();
+            showProfile(userData);
+          } else {
+            // User hasn't played yet, show empty profile
+            showProfile({
+              username: username,
+              score: 0,
+              gamesPlayed: 0,
+              wins: 0,
+              totalProfit: 0,
+              bestDay: 0,
+              streak: 0
+            });
+          }
+        } catch (error) {
+          console.error('Error loading profile:', error);
+        }
+      }
     });
 
     // Color scheme buttons
