@@ -393,13 +393,6 @@
       margin-bottom: 8px;
       border-radius: 8px;
       background: #f5f7fa;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .leaderboard-item:hover {
-      transform: translateX(5px);
-      background: #e2e8f0;
     }
 
     .leaderboard-item.current-user {
@@ -882,9 +875,17 @@
           highscore = portfolio;
           localStorage.setItem('highscore', highscore.toString());
           
-          // Submit/Update to Firebase
+          // Submit to Firebase
           if (firebaseReady && db) {
-            submitOrUpdateScore(username, highscore);
+            db.collection('leaderboard').add({
+              username: username,
+              score: highscore,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+              console.log('✅ Score submitted to Firebase!');
+            }).catch(err => {
+              console.error('❌ Error submitting score:', err);
+            });
           }
         }
 
@@ -924,81 +925,6 @@
     });
 
     // Leaderboard
-    async function submitOrUpdateScore(username, score) {
-      if (!firebaseReady || !db) return;
-
-      try {
-        const today = new Date().toDateString();
-        
-        // Check if user already has an entry
-        const snapshot = await db.collection('leaderboard')
-          .where('username', '==', username)
-          .limit(1)
-          .get();
-
-        if (!snapshot.empty) {
-          // Update existing entry
-          const doc = snapshot.docs[0];
-          const data = doc.data();
-          
-          // Update games played and wins
-          const gamesPlayed = (data.gamesPlayed || 0) + 1;
-          const wins = (data.wins || 0) + (score > INITIAL_CASH ? 1 : 0);
-          const totalProfit = (data.totalProfit || 0) + (score - INITIAL_CASH);
-          
-          // Calculate streak
-          const lastPlayedDate = data.lastPlayedDate || '';
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayStr = yesterday.toDateString();
-          
-          let streak = data.streak || 0;
-          if (lastPlayedDate === yesterdayStr) {
-            streak += 1; // Played yesterday, continue streak
-          } else if (lastPlayedDate === today) {
-            // Already played today, keep same streak
-          } else {
-            streak = 1; // Streak broken, start new
-          }
-          
-          // Track best day
-          const bestDay = Math.max(data.bestDay || 0, score);
-          
-          await doc.ref.update({
-            score: Math.max(data.score || 0, score), // Keep highest score
-            gamesPlayed: gamesPlayed,
-            wins: wins,
-            totalProfit: totalProfit,
-            bestDay: bestDay,
-            streak: streak,
-            lastPlayedDate: today,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          userDocId = doc.id;
-          localStorage.setItem('userDocId', userDocId);
-          console.log('✅ Score updated in Firebase!');
-        } else {
-          // Create new entry
-          const docRef = await db.collection('leaderboard').add({
-            username: username,
-            score: score,
-            gamesPlayed: 1,
-            wins: score > INITIAL_CASH ? 1 : 0,
-            totalProfit: score - INITIAL_CASH,
-            bestDay: score,
-            streak: 1,
-            lastPlayedDate: today,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          userDocId = docRef.id;
-          localStorage.setItem('userDocId', userDocId);
-          console.log('✅ Score submitted to Firebase!');
-        }
-      } catch (error) {
-        console.error('❌ Error submitting/updating score:', error);
-      }
-    }
-
     async function loadLeaderboard() {
       const list = document.getElementById('leaderboardList');
       const podium = document.getElementById('podium');
@@ -1108,9 +1034,6 @@
     // Modal Controls
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
       document.getElementById('leaderboardModal').classList.add('active');
-      // Make sure leaderboard view is shown
-      document.getElementById('leaderboardView').classList.remove('hidden');
-      document.getElementById('profileView').classList.remove('active');
       loadLeaderboard();
     });
 
@@ -1126,40 +1049,6 @@
 
     document.getElementById('closeSettingsBtn').addEventListener('click', () => {
       document.getElementById('settingsModal').classList.remove('active');
-    });
-
-    // My Profile button in settings
-    document.getElementById('myProfileBtn').addEventListener('click', async () => {
-      document.getElementById('settingsModal').classList.remove('active');
-      document.getElementById('leaderboardModal').classList.add('active');
-      
-      // Load current user's data
-      if (firebaseReady && db) {
-        try {
-          const snapshot = await db.collection('leaderboard')
-            .where('username', '==', username)
-            .limit(1)
-            .get();
-          
-          if (!snapshot.empty) {
-            const userData = snapshot.docs[0].data();
-            showProfile(userData);
-          } else {
-            // User hasn't played yet, show empty profile
-            showProfile({
-              username: username,
-              score: 0,
-              gamesPlayed: 0,
-              wins: 0,
-              totalProfit: 0,
-              bestDay: 0,
-              streak: 0
-            });
-          }
-        } catch (error) {
-          console.error('Error loading profile:', error);
-        }
-      }
     });
 
     // Color scheme buttons
@@ -1215,27 +1104,16 @@
             els.usernameError.textContent = 'Username already taken';
             return;
           }
-
-          // Update username in database if user has an entry
-          if (userDocId) {
-            await db.collection('leaderboard').doc(userDocId).update({
-              username: newUsername
-            });
-            console.log('✅ Username updated in Firebase!');
-          }
         } catch (error) {
           console.error('Username check error:', error);
         }
       }
 
-      const oldUsername = username;
       username = newUsername;
       localStorage.setItem('username', username);
       els.currentUsername.textContent = username;
       document.getElementById('settingsModal').classList.remove('active');
       showToast('Username updated!');
-      
-      console.log(`Username changed from ${oldUsername} to ${username}`);
     });
 
     // Close modals on overlay click
