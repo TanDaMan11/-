@@ -337,6 +337,9 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .podium-score {
@@ -430,6 +433,8 @@
       flex: 1;
       font-weight: 600;
       color: #2d3748;
+      display: flex;
+      align-items: center;
     }
 
     .leaderboard-score {
@@ -576,6 +581,55 @@
       background: #ff6a00;
       color: white;
     }
+
+    /* NEW: Prefix badge styles - visually fit with leaderboard and podium */
+    .prefix-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      margin-right: 8px;
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+    }
+
+    .rank-owner {
+      background: linear-gradient(90deg,#FFD54A,#FFB300);
+      color: #2d2a00;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .rank-pro {
+      background: linear-gradient(90deg,#4ea8ff,#2b8cff);
+      color: white;
+    }
+
+    .rank-vip {
+      background: linear-gradient(90deg,#2ecc71,#059669);
+      color: white;
+    }
+
+    .rank-newbie {
+      background: linear-gradient(90deg,#cbd5e0,#a0aec0);
+      color: #2d3748;
+    }
+
+    .rank-none {
+      display: none;
+    }
+
+    /* Keep prefix sized nicely in podium and username area */
+    .podium .prefix-badge {
+      font-size: 0.7rem;
+      padding: 6px 10px;
+      margin-right: 6px;
+    }
+
+    .current-username .prefix-badge {
+      margin-right: 6px;
+    }
   </style>
 </head>
 <body>
@@ -663,6 +717,8 @@
     </div>
   </div>
 
+  <div id="firebaseStatus" class="firebase-status disconnected">Firebase: Disconnected</div>
+
   <script>
     // Firebase Configuration
     const firebaseConfig = {
@@ -682,9 +738,15 @@
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
       firebaseReady = true;
+      document.getElementById('firebaseStatus').classList.remove('disconnected');
+      document.getElementById('firebaseStatus').classList.add('connected');
+      document.getElementById('firebaseStatus').textContent = 'Firebase: Connected';
       console.log('✅ Firebase initialized successfully');
     } catch (error) {
       console.error('❌ Firebase error:', error);
+      document.getElementById('firebaseStatus').classList.remove('connected');
+      document.getElementById('firebaseStatus').classList.add('disconnected');
+      document.getElementById('firebaseStatus').textContent = 'Firebase: Disconnected';
     }
 
     // Game State
@@ -697,7 +759,8 @@
     let dayEnded = false;
     let username = localStorage.getItem('username') || 'Guest' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     let userDocId = localStorage.getItem('userDocId') || null;
-    
+    let currentUserRank = null; // NEW: store current user's rank (if any)
+
     if (!localStorage.getItem('username')) {
       localStorage.setItem('username', username);
     }
@@ -807,7 +870,17 @@
       els.shares.textContent = shares;
       els.price.textContent = price.toFixed(2);
       els.highscore.textContent = highscore.toFixed(2);
-      els.currentUsername.textContent = username;
+      // Show username with prefix if user has rank set locally
+      if (currentUserRank && currentUserRank !== 'NONE') {
+        const prefixInfo = rankPrefixMap[currentUserRank] || null;
+        if (prefixInfo) {
+          els.currentUsername.innerHTML = `<span class="prefix-badge ${prefixInfo.class}">${prefixInfo.label}</span>${username}`;
+        } else {
+          els.currentUsername.textContent = username;
+        }
+      } else {
+        els.currentUsername.textContent = username;
+      }
       priceChart.update();
       
       // Update button text based on day status
@@ -884,7 +957,10 @@
           
           // Submit/Update to Firebase
           if (firebaseReady && db) {
-            submitOrUpdateScore(username, highscore);
+            submitOrUpdateScore(username, highscore).then(() => {
+              // After updating the score, reload user profile (to pick up rank if server-side changed)
+              loadCurrentUserProfile();
+            });
           }
         }
 
@@ -923,8 +999,146 @@
       render();
     });
 
-    // Leaderboard
-    async function submitOrUpdateScore(username, score) {
+    // ------------------------------
+    // NEW: Prefix / Rank Feature
+    // - Players can have a "rank" field in their Firestore leaderboard doc (e.g. 'OWNER', 'PRO', 'VIP', 'NEWBIE').
+    // - The leaderboard UI will display a colored prefix badge before the player's name based on that rank.
+    // - All work is client-side: reads rank from Firestore and renders appropriate badges.
+    // - Comments accompany each new section so you can tweak labels/colors later.
+    // ------------------------------
+
+    // Map of rank identifiers to display label and css class
+    const rankPrefixMap = {
+      'OWNER': { label: '[OWNER]', class: 'rank-owner' },
+      'PRO':   { label: '[PRO]',   class: 'rank-pro' },
+      'VIP':   { label: '[VIP]',   class: 'rank-vip' },
+      'NEWBIE':{ label: '[NEWBIE]',class: 'rank-newbie' },
+      'NONE':  { label: '',        class: 'rank-none' } // default / hidden
+    };
+
+    // Fetch leaderboard from Firestore and render
+    async function loadLeaderboard() {
+      const leaderboardList = document.getElementById('leaderboardList');
+      const podiumEl = document.getElementById('podium');
+
+      if (!firebaseReady || !db) {
+        leaderboardList.innerHTML = '<li class="leaderboard-item">Leaderboard requires Firebase connection.</li>';
+        podiumEl.innerHTML = '';
+        return;
+      }
+
+      try {
+        // Retrieve top players (ordered by score descending)
+        const snapshot = await db.collection('leaderboard')
+          .orderBy('score', 'desc')
+          .limit(50)
+          .get();
+
+        const docs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
+
+        // Render podium (top 3)
+        podiumEl.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+          const entry = docs[i];
+          if (!entry) continue;
+          const data = entry.data;
+          const rankKey = (data.rank || 'NONE').toUpperCase();
+          const prefixInfo = rankPrefixMap[rankKey] || rankPrefixMap['NONE'];
+
+          const place = ['first','second','third'][i] || '';
+          const placeEl = document.createElement('div');
+          placeEl.className = `podium-place ${place}`;
+          placeEl.innerHTML = `
+            <div class="podium-base">
+              <div class="podium-rank">${i+1}</div>
+              <div class="podium-name">
+                ${prefixInfo.label ? `<span class="prefix-badge ${prefixInfo.class}">${prefixInfo.label}</span>` : ''}
+                <span title="${data.username || 'Anonymous'}">${(data.username || 'Anonymous')}</span>
+              </div>
+              <div class="podium-score">$${(data.score || 0).toFixed(2)}</div>
+            </div>
+          `;
+          podiumEl.appendChild(placeEl);
+        }
+
+        // Render list
+        leaderboardList.innerHTML = '';
+        docs.forEach((entry, idx) => {
+          const d = entry.data;
+          const listItem = document.createElement('li');
+          listItem.className = 'leaderboard-item';
+          // style top 3 items slightly
+          if (idx === 0) listItem.classList.add('gold');
+          if (idx === 1) listItem.classList.add('silver');
+          if (idx === 2) listItem.classList.add('bronze');
+
+          // mark current user if matches username or userDocId
+          const isCurrentUser = (entry.id === userDocId) || (d.username === username);
+          if (isCurrentUser) listItem.classList.add('current-user');
+
+          const rankKey = (d.rank || 'NONE').toUpperCase();
+          const prefixInfo = rankPrefixMap[rankKey] || rankPrefixMap['NONE'];
+
+          listItem.innerHTML = `
+            <div class="leaderboard-rank">${idx + 1}</div>
+            <div class="leaderboard-name">
+              ${prefixInfo.label ? `<span class="prefix-badge ${prefixInfo.class}">${prefixInfo.label}</span>` : ''}
+              <span title="${d.username || 'Anonymous'}">${d.username || 'Anonymous'}</span>
+            </div>
+            <div class="leaderboard-score">$${(d.score || 0).toFixed(2)}</div>
+          `;
+
+          // clicking a leaderboard item could show more details in future
+          leaderboardList.appendChild(listItem);
+        });
+
+      } catch (error) {
+        console.error('❌ Error loading leaderboard:', error);
+        leaderboardList.innerHTML = '<li class="leaderboard-item">Failed to load leaderboard.</li>';
+        podiumEl.innerHTML = '';
+      }
+    }
+
+    // Load current user's leaderboard doc to pick up rank (if any)
+    // This will try to use userDocId if stored; otherwise search by username.
+    async function loadCurrentUserProfile() {
+      currentUserRank = null;
+      if (!firebaseReady || !db) {
+        render();
+        return;
+      }
+
+      try {
+        if (userDocId) {
+          // fetch by id
+          const doc = await db.collection('leaderboard').doc(userDocId).get();
+          if (doc.exists) {
+            const data = doc.data();
+            currentUserRank = (data.rank || 'NONE').toUpperCase();
+            // keep local userDocId in sync
+            userDocId = doc.id;
+            localStorage.setItem('userDocId', userDocId);
+          }
+        } else {
+          // search by username
+          const snapshot = await db.collection('leaderboard').where('username', '==', username).limit(1).get();
+          if (!snapshot.empty) {
+            const doc = snapshot.docs[0];
+            const data = doc.data();
+            currentUserRank = (data.rank || 'NONE').toUpperCase();
+            userDocId = doc.id;
+            localStorage.setItem('userDocId', userDocId);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error loading user profile:', error);
+      } finally {
+        render();
+      }
+    }
+
+    // Submit or update score in Firestore
+    async function submitOrUpdateScore(usernameArg, score) {
       if (!firebaseReady || !db) return;
 
       try {
@@ -932,7 +1146,7 @@
         
         // Check if user already has an entry
         const snapshot = await db.collection('leaderboard')
-          .where('username', '==', username)
+          .where('username', '==', usernameArg)
           .limit(1)
           .get();
 
@@ -963,7 +1177,9 @@
           
           // Track best day
           const bestDay = Math.max(data.bestDay || 0, score);
-          
+
+          // IMPORTANT: Do NOT overwrite rank if it exists on the doc.
+          // We intentionally do not set a 'rank' field here so manual rank changes in Firestore remain intact.
           await doc.ref.update({
             score: Math.max(data.score || 0, score), // Keep highest score
             gamesPlayed: gamesPlayed,
@@ -978,9 +1194,9 @@
           localStorage.setItem('userDocId', userDocId);
           console.log('✅ Score updated in Firebase!');
         } else {
-          // Create new entry
+          // Create new entry - default rank NONE (admins can later edit the doc to set rank)
           const docRef = await db.collection('leaderboard').add({
-            username: username,
+            username: usernameArg,
             score: score,
             gamesPlayed: 1,
             wins: score > INITIAL_CASH ? 1 : 0,
@@ -988,6 +1204,7 @@
             bestDay: score,
             streak: 1,
             lastPlayedDate: today,
+            rank: 'NONE', // default - can be changed manually in Firestore to assign prefixes
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
           });
           userDocId = docRef.id;
@@ -999,257 +1216,85 @@
       }
     }
 
-    async function loadLeaderboard() {
-      const list = document.getElementById('leaderboardList');
-      const podium = document.getElementById('podium');
-      
-      if (!firebaseReady || !db) {
-        list.innerHTML = '<li class="leaderboard-item">Firebase not connected</li>';
-        return;
-      }
-
-      try {
-        const snapshot = await db.collection('leaderboard')
-          .orderBy('score', 'desc')
-          .limit(100)
-          .get();
-        
-        const scores = [];
-        snapshot.forEach(doc => scores.push(doc.data()));
-
-        // Keep highest score per username
-        const userScores = {};
-        scores.forEach(entry => {
-          if (!userScores[entry.username] || entry.score > userScores[entry.username].score) {
-            userScores[entry.username] = entry;
-          }
-        });
-
-        const sorted = Object.values(userScores).sort((a, b) => b.score - a.score);
-        displayLeaderboard(sorted);
-      } catch (error) {
-        console.error('❌ Leaderboard error:', error);
-        list.innerHTML = '<li class="leaderboard-item">Error loading: ' + error.message + '</li>';
-      }
-    }
-
-    function displayLeaderboard(scores) {
-      const podium = document.getElementById('podium');
-      const list = document.getElementById('leaderboardList');
-      
-      podium.innerHTML = '';
-      list.innerHTML = '';
-
-      if (scores.length === 0) {
-        list.innerHTML = '<li class="leaderboard-item">No scores yet. Be the first!</li>';
-        return;
-      }
-
-      // Podium
-      const podiumData = [
-        { rank: 2, class: 'second', data: scores[1] },
-        { rank: 1, class: 'first', data: scores[0] },
-        { rank: 3, class: 'third', data: scores[2] }
-      ];
-
-      podiumData.forEach(({ rank, class: cls, data }) => {
-        if (data) {
-          const place = document.createElement('div');
-          place.className = `podium-place ${cls}`;
-          // ========== ADD RANK PREFIX TO PODIUM ==========
-          const rankBadge = getRankBadgeHTML(data.rank);
-          place.innerHTML = `
-            <div class="podium-rank">#${rank}</div>
-            <div class="podium-name">${rankBadge}${data.username}</div>
-            <div class="podium-score">${data.score.toFixed(2)}</div>
-            <div class="podium-base"></div>
-          `;
-          podium.appendChild(place);
-        }
-      });
-
-      // Top 10 List
-      const top10 = scores.slice(0, 10);
-      const userRank = scores.findIndex(s => s.username === username) + 1;
-
-      top10.forEach((entry, i) => {
-        const rank = i + 1;
-        const isCurrent = entry.username === username;
-        let cls = 'leaderboard-item';
-        
-        if (isCurrent) cls += ' current-user';
-        else if (rank === 1) cls += ' gold';
-        else if (rank === 2) cls += ' silver';
-        else if (rank === 3) cls += ' bronze';
-
-        const item = document.createElement('li');
-        item.className = cls;
-        item.innerHTML = `
-          <span class="leaderboard-rank">#${rank}</span>
-          <span class="leaderboard-name">${entry.username}</span>
-          <span class="leaderboard-score">${entry.score.toFixed(2)}</span>
-        `;
-        list.appendChild(item);
-      });
-
-      // Show user rank if outside top 10
-      if (userRank > 10 && userRank <= scores.length) {
-        const userEntry = scores[userRank - 1];
-        const item = document.createElement('li');
-        item.className = 'leaderboard-item current-user';
-        item.style.marginTop = '20px';
-        item.innerHTML = `
-          <span class="leaderboard-rank">#${userRank}</span>
-          <span class="leaderboard-name">${userEntry.username}</span>
-          <span class="leaderboard-score">${userEntry.score.toFixed(2)}</span>
-        `;
-        list.appendChild(item);
-      }
-    }
-
-    // Modal Controls
-    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+    // ------------------------------
+    // UI Event Listeners for Leaderboard + Settings
+    // ------------------------------
+    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
       document.getElementById('leaderboardModal').classList.add('active');
-      // Make sure leaderboard view is shown
-      document.getElementById('leaderboardView').classList.remove('hidden');
-      document.getElementById('profileView').classList.remove('active');
-      loadLeaderboard();
+      await loadLeaderboard();
     });
 
     document.getElementById('closeLeaderboardBtn').addEventListener('click', () => {
       document.getElementById('leaderboardModal').classList.remove('active');
     });
 
-    document.getElementById('settingsBtn').addEventListener('click', () => {
+    document.getElementById('settingsBtn').addEventListener('click', async () => {
       document.getElementById('settingsModal').classList.add('active');
-      els.usernameInput.value = '';
-      els.usernameError.textContent = '';
+      els.usernameInput.value = username;
+      // ensure we have latest rank info for display
+      await loadCurrentUserProfile();
     });
 
     document.getElementById('closeSettingsBtn').addEventListener('click', () => {
       document.getElementById('settingsModal').classList.remove('active');
+      els.usernameError.textContent = '';
     });
 
-    // My Profile button in settings
-    document.getElementById('myProfileBtn').addEventListener('click', async () => {
-      document.getElementById('settingsModal').classList.remove('active');
-      document.getElementById('leaderboardModal').classList.add('active');
-      
-      // Load current user's data
-      if (firebaseReady && db) {
-        try {
-          const snapshot = await db.collection('leaderboard')
-            .where('username', '==', username)
-            .limit(1)
-            .get();
-          
-          if (!snapshot.empty) {
-            const userData = snapshot.docs[0].data();
-            showProfile(userData);
-          } else {
-            // User hasn't played yet, show empty profile
-            showProfile({
-              username: username,
-              score: 0,
-              gamesPlayed: 0,
-              wins: 0,
-              totalProfit: 0,
-              bestDay: 0,
-              streak: 0
-            });
-          }
-        } catch (error) {
-          console.error('Error loading profile:', error);
-        }
-      }
-    });
-
-    // Color scheme buttons
-    document.querySelectorAll('.color-scheme-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const theme = btn.dataset.theme;
-        
-        // Remove all theme classes
-        document.body.classList.remove('cold', 'forest', 'sunset', 'ocean');
-        
-        // Add new theme if not default
-        if (theme !== 'default') {
-          document.body.classList.add(theme);
-        }
-        
-        // Update active state
-        document.querySelectorAll('.color-scheme-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        // Save theme
-        currentTheme = theme;
-        localStorage.setItem('theme', theme);
-      });
-    });
-
+    // Save username and attempt to update Firestore doc username (if one exists)
     document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
-      const newUsername = els.usernameInput.value.trim();
-      
-      if (!newUsername) {
-        els.usernameError.textContent = 'Username cannot be empty';
+      const newName = els.usernameInput.value.trim();
+      if (!newName) {
+        els.usernameError.textContent = 'Username cannot be empty.';
         return;
       }
-
-      if (newUsername.length < 3) {
-        els.usernameError.textContent = 'Username must be at least 3 characters';
+      if (newName.length < 2) {
+        els.usernameError.textContent = 'Choose a longer name.';
         return;
       }
+      // clear error
+      els.usernameError.textContent = '';
 
-      if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
-        els.usernameError.textContent = 'Only letters, numbers, and underscores allowed';
-        return;
-      }
-
-      // Check if username is taken
-      if (firebaseReady && db) {
-        try {
-          const snapshot = await db.collection('leaderboard')
-            .where('username', '==', newUsername)
-            .limit(1)
-            .get();
-          
-          if (!snapshot.empty && newUsername !== username) {
-            els.usernameError.textContent = 'Username already taken';
-            return;
-          }
-
-          // Update username in database if user has an entry
-          if (userDocId) {
-            await db.collection('leaderboard').doc(userDocId).update({
-              username: newUsername
-            });
-            console.log('✅ Username updated in Firebase!');
-          }
-        } catch (error) {
-          console.error('Username check error:', error);
-        }
-      }
-
-      const oldUsername = username;
-      username = newUsername;
+      // update local
+      username = newName;
       localStorage.setItem('username', username);
-      els.currentUsername.textContent = username;
+
+      // If we already have a userDocId, update the username field in Firestore to keep things consistent
+      if (firebaseReady && db && userDocId) {
+        try {
+          await db.collection('leaderboard').doc(userDocId).update({
+            username: username,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          showToast('Username saved and synced to Firebase.');
+        } catch (error) {
+          console.error('❌ Error updating username in Firebase:', error);
+          showToast('Saved locally. Failed to sync to Firebase.');
+        }
+      } else {
+        showToast('Username saved locally.');
+      }
+
+      // Refresh user profile to pick up any rank info linked to this username
+      await loadCurrentUserProfile();
+
+      // update UI and close
+      render();
       document.getElementById('settingsModal').classList.remove('active');
-      showToast('Username updated!');
-      
-      console.log(`Username changed from ${oldUsername} to ${username}`);
     });
 
-    // Close modals on overlay click
-    document.querySelectorAll('.modal-overlay').forEach(modal => {
-      modal.addEventListener('click', e => {
-        if (e.target === modal) modal.classList.remove('active');
-      });
-    });
+    // Small helper: on load, fetch user's profile (to pick up rank) and render
+    (async function init() {
+      await loadCurrentUserProfile();
+      render();
+    })();
 
-    // Initialize
+    // Optional: allow leaderboard modal to refresh by clicking inside (helpful during testing)
+    document.getElementById('leaderboardList').addEventListener('click', loadLeaderboard);
+
+    // Render initially
     render();
-    console.log('🎮 Game loaded! Username:', username);
+
+    // End of script
   </script>
 </body>
 </html>
