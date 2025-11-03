@@ -393,7 +393,6 @@
       margin-bottom: 8px;
       border-radius: 8px;
       background: #f5f7fa;
-      cursor: pointer;
       transition: all 0.2s ease;
     }
 
@@ -1076,9 +1075,6 @@
     // Modal Controls
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
       document.getElementById('leaderboardModal').classList.add('active');
-      // Make sure leaderboard view is shown
-      document.getElementById('leaderboardView').classList.remove('hidden');
-      document.getElementById('profileView').classList.remove('active');
       loadLeaderboard();
     });
 
