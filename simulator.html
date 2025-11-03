@@ -492,8 +492,14 @@
       box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
     }
 
-    .rank-prefix.newbie {
+    .rank-prefix.noob {
       background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(255, 106, 0, 0.4);
+    }
+
+    .rank-prefix.goonr {
+      background: linear-gradient(135deg, #895129 0%, #805a40 100%);
       color: white;
       box-shadow: 0 2px 8px rgba(255, 106, 0, 0.4);
     }
@@ -748,7 +754,8 @@
         'owner': { label: 'OWNER', class: 'owner' },
         'pro': { label: 'PRO', class: 'pro' },
         'vip': { label: 'VIP', class: 'vip' },
-        'newbie': { label: 'NEWBIE', class: 'newbie' }
+        'noob': { label: 'NOOB', class: 'noob' }
+        'goonr': { label: 'GOONR', class: 'goonr' }
       };
       
       const rankData = ranks[rank.toLowerCase()];
