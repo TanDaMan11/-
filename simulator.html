@@ -480,6 +480,18 @@
       box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
     }
 
+    .rank-prefix.admin {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(231, 76, 60, 0.4);
+    }
+
+    .rank-prefix.mod {
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(52, 152, 219, 0.4);
+    }
+
     .rank-prefix.pro {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -492,16 +504,28 @@
       box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
     }
 
+    .rank-prefix.member {
+      background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(149, 165, 166, 0.4);
+    }
+
     .rank-prefix.noob {
       background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
       color: white;
       box-shadow: 0 2px 8px rgba(255, 106, 0, 0.4);
     }
 
-    .rank-prefix.goonr {
-      background: linear-gradient(135deg, #895129 0%, #805a40 100%);
+    .rank-prefix.legend {
+      background: linear-gradient(135deg, #8e44ad 0%, #c0392b 100%);
       color: white;
-      box-shadow: 0 2px 8px rgba(255, 106, 0, 0.4);
+      box-shadow: 0 2px 8px rgba(142, 68, 173, 0.4);
+      animation: legendPulse 2s infinite;
+    }
+
+    @keyframes legendPulse {
+      0%, 100% { box-shadow: 0 2px 8px rgba(142, 68, 173, 0.4); }
+      50% { box-shadow: 0 4px 16px rgba(142, 68, 173, 0.8); }
     }
   </style>
 </head>
@@ -752,10 +776,13 @@
       
       const ranks = {
         'owner': { label: 'OWNER', class: 'owner' },
+        'admin': { label: 'ADMIN', class: 'admin' },
+        'mod': { label: 'MOD', class: 'mod' },
         'pro': { label: 'PRO', class: 'pro' },
         'vip': { label: 'VIP', class: 'vip' },
-        'noob': { label: 'NOOB', class: 'noob' }
-        'goonr': { label: 'GOONR', class: 'goonr' }
+        'member': { label: 'MEMBER', class: 'member' },
+        'noob': { label: 'NOOB', class: 'noob' },
+        'legend': { label: 'LEGEND', class: 'legend' }
       };
       
       const rankData = ranks[rank.toLowerCase()];
