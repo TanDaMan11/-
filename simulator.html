@@ -6,7 +6,7 @@
     <script src="https://www.gstatic.com/firebasejs/7.21.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/7.21.1/firebase-database.js"></script>
     <style>
-        /* Basic CSS for the Simulator */
+        /* Basic CSS for the Simulator (Keeps the original look) */
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
@@ -96,6 +96,7 @@
             padding: 5px 0;
             border-bottom: 1px dotted #ccc;
         }
+        /* The span inside the list item handles the colored rank */
     </style>
 </head>
 <body>
@@ -158,7 +159,7 @@
 
 
 <script>
-    // --- FIREBASE CONFIGURATION (Provided by User) ---
+    // --- FIREBASE CONFIGURATION (Using your provided keys) ---
     const firebaseConfig = {
         apiKey: "AIzaSyAm-sSqxQ8PFO-k-h7VihWgoqNEyyCMOJY",
         authDomain: "stock-game-1.firebaseapp.com",
@@ -166,9 +167,7 @@
         storageBucket: "stock-game-1.firebasestorage.app",
         messagingSenderId: "267640665201",
         appId: "1:267640665201:web:8c339b723ab4d5a5a157d0",
-        // The databaseURL is inferred from projectId for newer configs, 
-        // but we'll include it explicitly for compatibility, matching the default pattern.
-        databaseURL: "https://stock-game-1-default-rtdb.firebaseio.com"
+        databaseURL: "https://stock-game-1-default-rtdb.firebaseio.com" // Inferred from project ID
     };
 
     // Initialize Firebase
@@ -406,6 +405,7 @@
             // 2. Check if a rank was found and it's not empty
             if (rankData.label && rankData.label.length > 0) {
                 // Create a <span> for the custom tag with the specified color
+                // This is what adds the colored rank: [RANK]
                 tagHtml = `<span style="font-weight: bold; color: ${rankData.color};">[${rankData.label}]</span> `;
             }
             
