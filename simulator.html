@@ -1,1300 +1,459 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trade Simulator</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
-
-    .container {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 24px;
-      padding: 40px;
-      max-width: 900px;
-      margin: 0 auto;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .header-buttons {
-      display: flex;
-      gap: 10px;
-    }
-
-    .icon-btn {
-      width: 50px;
-      height: 50px;
-      border-radius: 12px;
-      border: none;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      font-size: 1.3rem;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .icon-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-
-    .stat-card {
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      border-radius: 16px;
-      padding: 20px;
-      transition: transform 0.3s ease;
-    }
-
-    .stat-card:hover {
-      transform: translateY(-5px);
-    }
-
-    .stat-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #666;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-
-    .stat-value {
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: #2d3748;
-    }
-
-    .stat-card.highlight {
-      background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
-    }
-
-    .chart-container {
-      background: white;
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 30px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    }
-
-    canvas {
-      max-width: 100%;
-      height: 300px !important;
-    }
-
-    .controls {
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-
-    button {
-      padding: 14px 32px;
-      font-size: 1rem;
-      font-weight: 600;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      text-transform: uppercase;
-    }
-
-    #buyAll {
-      background: linear-gradient(135deg, #0d7377 0%, #14a085 100%);
-      color: white;
-    }
-
-    #buyAll:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(13, 115, 119, 0.5);
-    }
-
-    #buy {
-      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-      color: white;
-    }
-
-    #buy:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(17, 153, 142, 0.5);
-    }
-
-    #sell {
-      background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
-      color: white;
-    }
-
-    #sell:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(238, 9, 121, 0.5);
-    }
-
-    #sellAll {
-      background: linear-gradient(135deg, #c31432 0%, #e03e52 100%);
-      color: white;
-    }
-
-    #sellAll:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(195, 20, 50, 0.5);
-    }
-
-    #tick {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      flex: 1 1 100%;
-    }
-
-    #tick:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-    }
-
-    .time-indicator {
-      text-align: center;
-      font-size: 0.9rem;
-      color: #666;
-      margin-bottom: 15px;
-      font-weight: 500;
-    }
-
-    .toast {
-      position: fixed;
-      right: 20px;
-      background: rgba(255, 106, 0, 0.95);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      z-index: 2000;
-      max-width: 250px;
-      transition: top 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
-    }
-
-    .toast.entering {
-      opacity: 0;
-      transform: translateX(100px);
-    }
-
-    .toast.visible {
-      opacity: 1;
-      transform: translateX(0);
-    }
-
-    .toast.exiting {
-      opacity: 0;
-      transform: translateX(100px);
-    }
-
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-
-    .modal-overlay.active {
-      display: flex;
-    }
-
-    .modal-content {
-      background: white;
-      border-radius: 24px;
-      padding: 40px;
-      max-width: 500px;
-      width: 90%;
-      text-align: center;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-      max-height: 85vh;
-      overflow-y: auto;
-    }
-
-    .modal-title {
-      font-size: 2.5rem;
-      font-weight: 800;
-      margin-bottom: 30px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .modal-stat {
-      font-size: 1.2rem;
-      margin: 15px 0;
-      color: #2d3748;
-    }
-
-    .modal-stat strong {
-      font-weight: 700;
-      color: #667eea;
-    }
-
-    .modal-stat.profit {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin: 25px 0;
-    }
-
-    .modal-stat.profit.positive {
-      color: #38ef7d;
-    }
-
-    .modal-stat.profit.negative {
-      color: #ff6a00;
-    }
-
-    .modal-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 16px 48px;
-      font-size: 1.1rem;
-      margin-top: 20px;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-    }
-
-    .modal-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
-    }
-
-    .podium {
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-      gap: 10px;
-      margin-bottom: 30px;
-      height: 200px;
-    }
-
-    .podium-place {
-      flex: 1;
-      max-width: 120px;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-    }
-
-    .podium-rank {
-      font-size: 2rem;
-      font-weight: 800;
-      margin-bottom: 5px;
-    }
-
-    .podium-name {
-      font-size: 0.9rem;
-      font-weight: 600;
-      margin-bottom: 5px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .podium-score {
-      font-size: 0.85rem;
-      color: #666;
-      margin-bottom: 10px;
-    }
-
-    .podium-base {
-      border-radius: 8px 8px 0 0;
-      padding: 15px 10px;
-    }
-
-    .podium-place.first .podium-base {
-      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-      height: 120px;
-    }
-
-    .podium-place.first .podium-rank {
-      color: #FFD700;
-    }
-
-    .podium-place.second {
-      order: -1;
-    }
-
-    .podium-place.second .podium-base {
-      background: linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 100%);
-      height: 90px;
-    }
-
-    .podium-place.second .podium-rank {
-      color: #C0C0C0;
-    }
-
-    .podium-place.third .podium-base {
-      background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
-      height: 70px;
-    }
-
-    .podium-place.third .podium-rank {
-      color: #CD7F32;
-    }
-
-    .leaderboard-list {
-      list-style: none;
-      margin-top: 20px;
-    }
-
-    .leaderboard-item {
-      display: flex;
-      align-items: center;
-      padding: 12px 15px;
-      margin-bottom: 8px;
-      border-radius: 8px;
-      background: #f5f7fa;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .leaderboard-item:hover {
-      transform: translateX(5px);
-      background: #e2e8f0;
-    }
-
-    .leaderboard-item.current-user {
-      background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
-      border: 2px solid #667eea;
-    }
-
-    .leaderboard-item.gold {
-      background: linear-gradient(135deg, #FFD70020 0%, #FFA50020 100%);
-    }
-
-    .leaderboard-item.silver {
-      background: linear-gradient(135deg, #C0C0C020 0%, #A8A8A820 100%);
-    }
-
-    .leaderboard-item.bronze {
-      background: linear-gradient(135deg, #CD7F3220 0%, #B8733320 100%);
-    }
-
-    .leaderboard-rank {
-      font-weight: 700;
-      font-size: 1.1rem;
-      min-width: 40px;
-      color: #2d3748;
-    }
-
-    .leaderboard-name {
-      flex: 1;
-      font-weight: 600;
-      color: #2d3748;
-      display: flex;
-      align-items: center;
-    }
-
-    .leaderboard-score {
-      font-weight: 700;
-      color: #667eea;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-      text-align: left;
-    }
-
-    .form-label {
-      display: block;
-      font-weight: 600;
-      color: #2d3748;
-      margin-bottom: 8px;
-    }
-
-    .form-input {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      font-size: 1rem;
-    }
-
-    .form-input:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    .form-error {
-      color: #ff6a00;
-      font-size: 0.85rem;
-      margin-top: 5px;
-    }
-
-    .current-username {
-      display: inline-block;
-      padding: 8px 16px;
-      background: #f5f7fa;
-      border-radius: 8px;
-      font-weight: 600;
-      color: #667eea;
-    }
-
-    .settings-menu {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-
-    .settings-menu-btn {
-      padding: 20px;
-      background: linear-gradient(135deg, #f5f7fa 0%, #e2e8f0 100%);
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #2d3748;
-      text-transform: none;
-    }
-
-    .settings-menu-btn:hover {
-      transform: translateX(5px);
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .settings-submenu {
-      display: none;
-    }
-
-    .settings-submenu.active {
-      display: block;
-    }
-
-    .color-scheme-btn {
-      padding: 15px;
-      border: 2px solid #e2e8f0;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-weight: 600;
-      text-transform: none;
-    }
-
-    .color-scheme-btn:hover {
-      transform: scale(1.05);
-    }
-
-    .color-scheme-btn.active {
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-    }
-
-    .color-scheme-btn.default {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .color-scheme-btn.cold {
-      background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-      color: white;
-    }
-
-    .color-scheme-btn.forest {
-      background: linear-gradient(135deg, #134e4a 0%, #059669 100%);
-      color: white;
-    }
-
-    .color-scheme-btn.sunset {
-      background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
-      color: white;
-    }
-
-    .color-scheme-btn.ocean {
-      background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
-      color: white;
-    }
-
-    .firebase-status {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      z-index: 3000;
-    }
-
-    .firebase-status.connected {
-      background: #38ef7d;
-      color: white;
-    }
-
-    .firebase-status.disconnected {
-      background: #ff6a00;
-      color: white;
-    }
-
-    /* NEW: Prefix badge styles - visually fit with leaderboard and podium */
-    .prefix-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-weight: 700;
-      margin-right: 8px;
-      font-size: 0.75rem;
-      letter-spacing: 0.5px;
-    }
-
-    .rank-owner {
-      background: linear-gradient(90deg,#FFD54A,#FFB300);
-      color: #2d2a00;
-      border: 1px solid rgba(0,0,0,0.08);
-    }
-
-    .rank-pro {
-      background: linear-gradient(90deg,#4ea8ff,#2b8cff);
-      color: white;
-    }
-
-    .rank-vip {
-      background: linear-gradient(90deg,#2ecc71,#059669);
-      color: white;
-    }
-
-    .rank-newbie {
-      background: linear-gradient(90deg,#cbd5e0,#a0aec0);
-      color: #2d3748;
-    }
-
-    .rank-none {
-      display: none;
-    }
-
-    /* Keep prefix sized nicely in podium and username area */
-    .podium .prefix-badge {
-      font-size: 0.7rem;
-      padding: 6px 10px;
-      margin-right: 6px;
-    }
-
-    .current-username .prefix-badge {
-      margin-right: 6px;
-    }
-  </style>
+    <title>Trade Simulator</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.21.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.21.1/firebase-database.js"></script>
+    <style>
+        /* Basic CSS for the Simulator */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        .stat, .button-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #ecf0f1;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #end-day-message {
+            padding: 15px;
+            background-color: #f1c40f;
+            color: #333;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none; /* Initially hidden */
+        }
+        /* Modal for Leaderboard/Settings */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 8px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        #leaderboard ul {
+            list-style: none;
+            padding: 0;
+        }
+        #leaderboard ul li {
+            padding: 5px 0;
+            border-bottom: 1px dotted #ccc;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>Trade Simulator</h1>
-      <div class="header-buttons">
-        <button class="icon-btn" id="leaderboardBtn" title="Leaderboard">🏆</button>
-        <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
-      </div>
+
+<div class="container">
+    <h1>Trade Simulator</h1>
+    <p>
+        <button onclick="showModal('leaderboard-modal')">🏆 Leaderboard</button>
+        <button onclick="showModal('settings-modal')">⚙️ Settings</button>
+    </p>
+
+    <div id="stats">
+        <div class="stat">Cash: <span id="cash">$1000</span></div>
+        <div class="stat">Shares: <span id="shares">0</span></div>
+        <div class="stat">Market Price: <span id="market-price">$50</span></div>
+        <div class="stat">🏆 Highscore: <span id="highscore">$0</span></div>
+    </div>
+
+    <div class="button-group" id="trade-controls">
+        <button onclick="buy(1000000)">Buy All</button>
+        <button onclick="buy(1)">Buy 1</button>
+        <button onclick="sell(1)">Sell 1</button>
+        <button onclick="sell(1000000)">Sell All</button>
+        <button onclick="nextTimeStep()">Next 30 Minutes</button>
     </div>
     
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Cash</div>
-        <div class="stat-value">$<span id="cash">1000</span></div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-label">Shares</div>
-        <div class="stat-value"><span id="shares">0</span></div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-label">Market Price</div>
-        <div class="stat-value">$<span id="price">50</span></div>
-      </div>
-      
-      <div class="stat-card highlight">
-        <div class="stat-label">🏆 Highscore</div>
-        <div class="stat-value">$<span id="highscore">0</span></div>
-      </div>
+    <div id="end-day-message">
+        Day Ended <br>
+        Final Portfolio: <strong id="final-portfolio">$0</strong> <br>
+        Profit/Loss: <span id="profit-loss">$0 (0%)</span> <br>
+        Highscore: <strong id="new-highscore">$0</strong>
+        <button onclick="continueTrading()">Continue Trading</button>
     </div>
 
-    <div class="chart-container">
-      <canvas id="priceChart"></canvas>
-    </div>
+</div>
 
-    <div class="controls">
-      <button id="buyAll">Buy All</button>
-      <button id="buy">Buy 1</button>
-      <button id="sell">Sell 1</button>
-      <button id="sellAll">Sell All</button>
-      <button id="tick">Next 30 Minutes</button>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="endDayModal">
+<div id="leaderboard-modal" class="modal">
     <div class="modal-content">
-      <div class="modal-title">Day Ended</div>
-      <div>
-        <div class="modal-stat">Final Portfolio: <strong>$<span id="modalPortfolio">0</span></strong></div>
-        <div class="modal-stat profit" id="modalProfit">Profit/Loss: $0 (0%)</div>
-        <div class="modal-stat">Highscore: <strong>$<span id="modalHighscore">0</span></strong></div>
-      </div>
-      <button class="modal-btn" id="continueBtn">Continue Trading</button>
+        <span class="close" onclick="closeModal('leaderboard-modal')">&times;</span>
+        <h2>🏆 Leaderboard</h2>
+        <div id="leaderboard">
+            <ul>
+                <li>Loading...</li>
+            </ul>
+        </div>
     </div>
-  </div>
+</div>
 
-  <div class="modal-overlay" id="leaderboardModal">
+<div id="settings-modal" class="modal">
     <div class="modal-content">
-      <div class="modal-title">🏆 Leaderboard</div>
-      <div class="podium" id="podium"></div>
-      <ul class="leaderboard-list" id="leaderboardList">
-        <li class="leaderboard-item">Loading...</li>
-      </ul>
-      <button class="modal-btn" id="closeLeaderboardBtn">Close</button>
+        <span class="close" onclick="closeModal('settings-modal')">&times;</span>
+        <h2>⚙️ Settings</h2>
+        <p>Current Username: <strong id="current-username">Guest0000</strong></p>
+        <label for="new-username-input">Change Username:</label><br>
+        <input type="text" id="new-username-input" placeholder="Enter new username"><br><br>
+        <button onclick="saveUsername()">Save Username</button>
+        <button onclick="closeModal('settings-modal')">Cancel</button>
     </div>
-  </div>
+</div>
 
-  <div class="modal-overlay" id="settingsModal">
-    <div class="modal-content">
-      <div class="modal-title">⚙️ Settings</div>
-      <div class="form-group">
-        <label class="form-label">Current Username</label>
-        <div class="current-username" id="currentUsername">Guest0000</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="usernameInput">Change Username</label>
-        <input type="text" id="usernameInput" class="form-input" placeholder="Enter new username" maxlength="20">
-        <div class="form-error" id="usernameError"></div>
-      </div>
-      <button class="modal-btn" id="saveUsernameBtn">Save Username</button>
-      <button class="modal-btn" id="closeSettingsBtn" style="background: #cbd5e0; color: #2d3748;       margin-left: 10px;">Cancel</button>
-    </div>
-  </div>
 
-  <div id="firebaseStatus" class="firebase-status disconnected">Firebase: Disconnected</div>
-
-  <script>
-    // Firebase Configuration
+<script>
+    // --- FIREBASE CONFIGURATION (Provided by User) ---
     const firebaseConfig = {
-      apiKey: "AIzaSyAm-sSqxQ8PFO-k-h7VihWgoqNEyyCMOJY",
-      authDomain: "stock-game-1.firebaseapp.com",
-      projectId: "stock-game-1",
-      storageBucket: "stock-game-1.firebasestorage.app",
-      messagingSenderId: "267640665201",
-      appId: "1:267640665201:web:8c339b723ab4d5a5a157d0"
+        apiKey: "AIzaSyAm-sSqxQ8PFO-k-h7VihWgoqNEyyCMOJY",
+        authDomain: "stock-game-1.firebaseapp.com",
+        projectId: "stock-game-1",
+        storageBucket: "stock-game-1.firebasestorage.app",
+        messagingSenderId: "267640665201",
+        appId: "1:267640665201:web:8c339b723ab4d5a5a157d0",
+        // The databaseURL is inferred from projectId for newer configs, 
+        // but we'll include it explicitly for compatibility, matching the default pattern.
+        databaseURL: "https://stock-game-1-default-rtdb.firebaseio.com"
     };
 
     // Initialize Firebase
-    let db = null;
-    let firebaseReady = false;
-
-    try {
-      firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore();
-      firebaseReady = true;
-      document.getElementById('firebaseStatus').classList.remove('disconnected');
-      document.getElementById('firebaseStatus').classList.add('connected');
-      document.getElementById('firebaseStatus').textContent = 'Firebase: Connected';
-      console.log('✅ Firebase initialized successfully');
-    } catch (error) {
-      console.error('❌ Firebase error:', error);
-      document.getElementById('firebaseStatus').classList.remove('connected');
-      document.getElementById('firebaseStatus').classList.add('disconnected');
-      document.getElementById('firebaseStatus').textContent = 'Firebase: Disconnected';
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
     }
 
-    // Game State
-    const INITIAL_CASH = 1000;
-    let cash = INITIAL_CASH;
-    let shares = 0;
-    let price = 50;
-    let highscore = parseFloat(localStorage.getItem('highscore') || '0');
-    let tickCount = 0;
-    let dayEnded = false;
-    let username = localStorage.getItem('username') || 'Guest' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    let userDocId = localStorage.getItem('userDocId') || null;
-    let currentUserRank = null; // NEW: store current user's rank (if any)
+    // Database references
+    var db = firebase.database();
+    var dbRef = db.ref('leaderboard');
+    
+    // --- INITIAL VARIABLES ---
+    var username = localStorage.getItem('simulatorUsername') || "Guest" + Math.floor(Math.random() * 10000);
+    var cash = 1000.00;
+    var shares = 0;
+    var price = 50.00;
+    var highscore = parseFloat(localStorage.getItem('simulatorHighscore')) || 0.00;
+    var timeStep = 0; // Tracks the trading day progress (e.g., 0 to 8)
+    var DAY_LENGTH = 8; // Number of trading steps in a day
 
-    if (!localStorage.getItem('username')) {
-      localStorage.setItem('username', username);
+    // --- NEW CODE BLOCK: FIREBASE RANK/TAG MANAGER (Start) ---
+
+    // Storage for the ranks loaded from Firebase
+    let globalUserRanks = {}; 
+
+    // Global variable to hold the last fetched scores (for re-rendering)
+    let latestScores = [];
+
+    // Function to load ranks from the dedicated Firebase 'userRanks' node
+    function loadUserRanks() {
+        // Listen for changes on the 'userRanks' node
+        db.ref('userRanks').on('value', function(snapshot) {
+            if (snapshot.exists()) {
+                // Update the global variable with the latest data
+                globalUserRanks = snapshot.val();
+                console.log("User ranks loaded from Firebase.", globalUserRanks);
+                // Re-render the leaderboard with the new ranks if we have scores
+                if (latestScores.length > 0) {
+                    updateLeaderboard(latestScores); 
+                }
+            } else {
+                console.log("No userRanks node found in Firebase. Please create the node in Firebase.");
+            }
+        });
     }
 
-    // DOM Elements
-    const els = {
-      cash: document.getElementById('cash'),
-      shares: document.getElementById('shares'),
-      price: document.getElementById('price'),
-      highscore: document.getElementById('highscore'),
-      currentUsername: document.getElementById('currentUsername'),
-      modalPortfolio: document.getElementById('modalPortfolio'),
-      modalProfit: document.getElementById('modalProfit'),
-      modalHighscore: document.getElementById('modalHighscore'),
-      usernameInput: document.getElementById('usernameInput'),
-      usernameError: document.getElementById('usernameError')
-    };
+    // Function to retrieve a user's rank/tag from the loaded list
+    function getUserRank(username) {
+        // Look up the rank, defaulting to empty if not found.
+        return globalUserRanks[username] || { label: "", color: "" };
+    }
 
-    // Chart Setup
-    function getTimeLabels() {
-      const labels = [];
-      for (let i = 0; i <= 24; i++) {
-        const totalMinutes = 7 * 60 + i * 30;
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours > 12 ? hours - 12 : hours;
-        labels.push(`${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`);
-      }
-      return labels;
+    // Call the rank loader function when the app loads
+    loadUserRanks(); 
+
+    // --- NEW CODE BLOCK: FIREBASE RANK/TAG MANAGER (End) ---
+    
+
+    // --- MAIN GAME LOGIC ---
+
+    function updateDisplay() {
+        $('#cash').text('$' + cash.toFixed(2));
+        $('#shares').text(shares);
+        $('#market-price').text('$' + price.toFixed(2));
+        $('#highscore').text('$' + highscore.toFixed(2));
+        $('#current-username').text(username);
+    }
+
+    function buy(amount) {
+        let maxBuy = Math.floor(cash / price);
+        let buyAmount = Math.min(amount, maxBuy);
+        
+        if (buyAmount > 0) {
+            cash -= buyAmount * price;
+            shares += buyAmount;
+            updateDisplay();
+        } else if (amount === 1000000) {
+            alert("Not enough cash to buy any shares.");
+        }
+    }
+
+    function sell(amount) {
+        let sellAmount = Math.min(amount, shares);
+        
+        if (sellAmount > 0) {
+            cash += sellAmount * price;
+            shares -= sellAmount;
+            updateDisplay();
+        } else if (amount === 1000000) {
+            alert("No shares to sell.");
+        }
+    }
+
+    function calculatePortfolio() {
+        return cash + (shares * price);
+    }
+
+    function nextTimeStep() {
+        if (timeStep >= DAY_LENGTH) {
+            endDay();
+            return;
+        }
+
+        // Simulate market volatility
+        let volatility = 0.05 * price; // 5% volatility
+        let change = (Math.random() - 0.5) * 2 * volatility;
+        price = Math.max(0.01, price + change); // Price never goes below 1 cent
+        
+        timeStep++;
+        updateDisplay();
+
+        if (timeStep >= DAY_LENGTH) {
+            endDay();
+        }
+    }
+
+    function endDay() {
+        let finalPortfolio = calculatePortfolio();
+        let initialValue = 1000.00;
+        let profitLoss = finalPortfolio - initialValue;
+        let percentChange = (profitLoss / initialValue) * 100;
+
+        // Update Highscore
+        if (finalPortfolio > highscore) {
+            highscore = finalPortfolio;
+            localStorage.setItem('simulatorHighscore', highscore.toFixed(2));
+        }
+
+        // Submit score to Firebase
+        submitScore(username, finalPortfolio);
+
+        // Update End Day Message
+        $('#final-portfolio').text('$' + finalPortfolio.toFixed(2));
+        $('#profit-loss').text('$' + profitLoss.toFixed(2) + ' (' + percentChange.toFixed(2) + '%)');
+        $('#new-highscore').text('$' + highscore.toFixed(2));
+        
+        // Disable controls and show message
+        $('#trade-controls button').prop('disabled', true);
+        $('#end-day-message').show();
+    }
+
+    function continueTrading() {
+        // Reset for a new day
+        cash = 1000.00;
+        shares = 0;
+        price = 50.00;
+        timeStep = 0;
+
+        // Reset display
+        $('#trade-controls button').prop('disabled', false);
+        $('#end-day-message').hide();
+        updateDisplay();
     }
     
-    const timeLabels = getTimeLabels();
-    const ctx = document.getElementById('priceChart').getContext('2d');
-    const priceChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [timeLabels[0]],
-        datasets: [{
-          label: 'Stock Price',
-          data: [price],
-          borderColor: '#667eea',
-          backgroundColor: 'rgba(102, 126, 234, 0.1)',
-          borderWidth: 3,
-          fill: true,
-          tension: 0,
-          pointRadius: 4,
-          pointBackgroundColor: '#667eea',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 2,
-          segment: {
-            borderColor: ctx => {
-              const { p0, p1 } = ctx;
-              return p1.parsed.y >= p0.parsed.y ? '#38ef7d' : '#ff6a00';
-            }
-          }
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: false,
-            ticks: { callback: v => '$' + v.toFixed(2) }
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: { label: ctx => 'Price: $' + ctx.parsed.y.toFixed(2) }
-          }
-        }
-      }
-    });
+    // --- FIREBASE LEADERBOARD FUNCTIONS ---
 
-    // Toast System
-    let toasts = [];
+    function submitScore(username, score) {
+        // Find the user's best score in the last 24 hours
+        var cutoff = Date.now() - (24 * 60 * 60 * 1000); 
 
-    function updateToastPositions() {
-      toasts.forEach((toast, i) => toast.style.top = (20 + i * 70) + 'px');
-    }
+        // Query the leaderboard for the user's latest score
+        dbRef.orderByChild('username').equalTo(username).limitToLast(1).once('value', function(snapshot) {
+            let shouldUpdate = true;
+            let existingKey = null;
 
-    function showToast(message) {
-      const toast = document.createElement('div');
-      toast.className = 'toast entering';
-      toast.textContent = message;
-      document.body.appendChild(toast);
-      toasts.push(toast);
-      updateToastPositions();
-      
-      setTimeout(() => toast.classList.replace('entering', 'visible'), 10);
-      setTimeout(() => {
-        toast.classList.replace('visible', 'exiting');
-        setTimeout(() => {
-          const idx = toasts.indexOf(toast);
-          if (idx > -1) toasts.splice(idx, 1);
-          updateToastPositions();
-          if (document.body.contains(toast)) document.body.removeChild(toast);
-        }, 300);
-      }, 1500);
-    }
-
-    // Render
-    function render() {
-      els.cash.textContent = cash.toFixed(2);
-      els.shares.textContent = shares;
-      els.price.textContent = price.toFixed(2);
-      els.highscore.textContent = highscore.toFixed(2);
-      // Show username with prefix if user has rank set locally
-      if (currentUserRank && currentUserRank !== 'NONE') {
-        const prefixInfo = rankPrefixMap[currentUserRank] || null;
-        if (prefixInfo) {
-          els.currentUsername.innerHTML = `<span class="prefix-badge ${prefixInfo.class}">${prefixInfo.label}</span>${username}`;
-        } else {
-          els.currentUsername.textContent = username;
-        }
-      } else {
-        els.currentUsername.textContent = username;
-      }
-      priceChart.update();
-      
-      // Update button text based on day status
-      const tickBtn = document.getElementById('tick');
-      if (dayEnded) {
-        tickBtn.textContent = 'End Day';
-      } else {
-        tickBtn.textContent = 'Next 30 Minutes';
-      }
-    }
-
-    // Game Actions
-    document.getElementById('buyAll').addEventListener('click', () => {
-      const canBuy = Math.floor(cash / price);
-      if (canBuy > 0) {
-        cash -= canBuy * price;
-        shares += canBuy;
-        render();
-      } else {
-        showToast('Not enough cash!');
-      }
-    });
-
-    document.getElementById('buy').addEventListener('click', () => {
-      if (cash >= price) {
-        cash -= price;
-        shares += 1;
-        render();
-      } else {
-        showToast('Not enough cash!');
-      }
-    });
-
-    document.getElementById('sell').addEventListener('click', () => {
-      if (shares > 0) {
-        cash += price;
-        shares -= 1;
-        render();
-      } else {
-        showToast('No shares to sell!');
-      }
-    });
-
-    document.getElementById('sellAll').addEventListener('click', () => {
-      if (shares > 0) {
-        cash += shares * price;
-        shares = 0;
-        render();
-      } else {
-        showToast('No shares to sell!');
-      }
-    });
-
-    document.getElementById('tick').addEventListener('click', () => {
-      // If day has ended, just show the modal again
-      if (dayEnded) {
-        document.getElementById('endDayModal').classList.add('active');
-        return;
-      }
-
-      const change = (Math.random() - 0.5) * 4;
-      price = Math.max(0.1, price + change);
-      tickCount++;
-      priceChart.data.labels.push(timeLabels[tickCount]);
-      priceChart.data.datasets[0].data.push(price);
-
-      if (tickCount >= 24) {
-        dayEnded = true;
-        const portfolio = cash + shares * price;
-        
-        if (portfolio > highscore) {
-          highscore = portfolio;
-          localStorage.setItem('highscore', highscore.toString());
-          
-          // Submit/Update to Firebase
-          if (firebaseReady && db) {
-            submitOrUpdateScore(username, highscore).then(() => {
-              // After updating the score, reload user profile (to pick up rank if server-side changed)
-              loadCurrentUserProfile();
+            snapshot.forEach(function(childSnapshot) {
+                const existingScore = childSnapshot.val();
+                if (existingScore.score >= score) {
+                    shouldUpdate = false; // Don't submit if the new score isn't better
+                } else {
+                    existingKey = childSnapshot.key; // Mark the old, lower score for deletion
+                }
             });
-          }
-        }
 
-        const profit = portfolio - INITIAL_CASH;
-        const profitPercent = ((profit / INITIAL_CASH) * 100).toFixed(2);
-        
-        els.modalPortfolio.textContent = portfolio.toFixed(2);
-        els.modalHighscore.textContent = highscore.toFixed(2);
-        els.modalProfit.className = 'modal-stat profit ' + (profit > 0 ? 'positive' : profit < 0 ? 'negative' : '');
-        els.modalProfit.textContent = `Profit/Loss: ${profit.toFixed(2)} (${profitPercent}%)`;
-        
-        // Update button text in modal
-        document.getElementById('continueBtn').textContent = 'Start New Day';
-        
-        document.getElementById('endDayModal').classList.add('active');
-      }
-      
-      render();
-    });
-
-    document.getElementById('continueBtn').addEventListener('click', () => {
-      document.getElementById('endDayModal').classList.remove('active');
-      
-      // Reset for new day
-      cash = INITIAL_CASH;
-      shares = 0;
-      price = 50;
-      tickCount = 0;
-      dayEnded = false;
-      priceChart.data.labels = [timeLabels[0]];
-      priceChart.data.datasets[0].data = [price];
-      
-      // Reset button text
-      document.getElementById('continueBtn').textContent = 'Continue Trading';
-      
-      render();
-    });
-
-    // ------------------------------
-    // NEW: Prefix / Rank Feature
-    // - Players can have a "rank" field in their Firestore leaderboard doc (e.g. 'OWNER', 'PRO', 'VIP', 'NEWBIE').
-    // - The leaderboard UI will display a colored prefix badge before the player's name based on that rank.
-    // - All work is client-side: reads rank from Firestore and renders appropriate badges.
-    // - Comments accompany each new section so you can tweak labels/colors later.
-    // ------------------------------
-
-    // Map of rank identifiers to display label and css class
-    const rankPrefixMap = {
-      'OWNER': { label: '[OWNER]', class: 'rank-owner' },
-      'PRO':   { label: '[PRO]',   class: 'rank-pro' },
-      'VIP':   { label: '[VIP]',   class: 'rank-vip' },
-      'NEWBIE':{ label: '[NEWBIE]',class: 'rank-newbie' },
-      'NONE':  { label: '',        class: 'rank-none' } // default / hidden
-    };
-
-    // Fetch leaderboard from Firestore and render
-    async function loadLeaderboard() {
-      const leaderboardList = document.getElementById('leaderboardList');
-      const podiumEl = document.getElementById('podium');
-
-      if (!firebaseReady || !db) {
-        leaderboardList.innerHTML = '<li class="leaderboard-item">Leaderboard requires Firebase connection.</li>';
-        podiumEl.innerHTML = '';
-        return;
-      }
-
-      try {
-        // Retrieve top players (ordered by score descending)
-        const snapshot = await db.collection('leaderboard')
-          .orderBy('score', 'desc')
-          .limit(50)
-          .get();
-
-        const docs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
-
-        // Render podium (top 3)
-        podiumEl.innerHTML = '';
-        for (let i = 0; i < 3; i++) {
-          const entry = docs[i];
-          if (!entry) continue;
-          const data = entry.data;
-          const rankKey = (data.rank || 'NONE').toUpperCase();
-          const prefixInfo = rankPrefixMap[rankKey] || rankPrefixMap['NONE'];
-
-          const place = ['first','second','third'][i] || '';
-          const placeEl = document.createElement('div');
-          placeEl.className = `podium-place ${place}`;
-          placeEl.innerHTML = `
-            <div class="podium-base">
-              <div class="podium-rank">${i+1}</div>
-              <div class="podium-name">
-                ${prefixInfo.label ? `<span class="prefix-badge ${prefixInfo.class}">${prefixInfo.label}</span>` : ''}
-                <span title="${data.username || 'Anonymous'}">${(data.username || 'Anonymous')}</span>
-              </div>
-              <div class="podium-score">$${(data.score || 0).toFixed(2)}</div>
-            </div>
-          `;
-          podiumEl.appendChild(placeEl);
-        }
-
-        // Render list
-        leaderboardList.innerHTML = '';
-        docs.forEach((entry, idx) => {
-          const d = entry.data;
-          const listItem = document.createElement('li');
-          listItem.className = 'leaderboard-item';
-          // style top 3 items slightly
-          if (idx === 0) listItem.classList.add('gold');
-          if (idx === 1) listItem.classList.add('silver');
-          if (idx === 2) listItem.classList.add('bronze');
-
-          // mark current user if matches username or userDocId
-          const isCurrentUser = (entry.id === userDocId) || (d.username === username);
-          if (isCurrentUser) listItem.classList.add('current-user');
-
-          const rankKey = (d.rank || 'NONE').toUpperCase();
-          const prefixInfo = rankPrefixMap[rankKey] || rankPrefixMap['NONE'];
-
-          listItem.innerHTML = `
-            <div class="leaderboard-rank">${idx + 1}</div>
-            <div class="leaderboard-name">
-              ${prefixInfo.label ? `<span class="prefix-badge ${prefixInfo.class}">${prefixInfo.label}</span>` : ''}
-              <span title="${d.username || 'Anonymous'}">${d.username || 'Anonymous'}</span>
-            </div>
-            <div class="leaderboard-score">$${(d.score || 0).toFixed(2)}</div>
-          `;
-
-          // clicking a leaderboard item could show more details in future
-          leaderboardList.appendChild(listItem);
+            if (shouldUpdate) {
+                // If a new high score is achieved, create the new record
+                var newScore = {
+                    username: username,
+                    score: score,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                    // Tags are intentionally NOT saved here, they are looked up from 'userRanks'
+                };
+                
+                // Save the new score
+                dbRef.push(newScore).then(function() {
+                    console.log("New high score submitted!");
+                    
+                    // If an old lower score was found, delete it to keep the leaderboard clean
+                    if (existingKey) {
+                        dbRef.child(existingKey).remove();
+                    }
+                });
+            } else {
+                console.log("Score not submitted: not a new high score for the user.");
+            }
         });
-
-      } catch (error) {
-        console.error('❌ Error loading leaderboard:', error);
-        leaderboardList.innerHTML = '<li class="leaderboard-item">Failed to load leaderboard.</li>';
-        podiumEl.innerHTML = '';
-      }
     }
 
-    // Load current user's leaderboard doc to pick up rank (if any)
-    // This will try to use userDocId if stored; otherwise search by username.
-    async function loadCurrentUserProfile() {
-      currentUserRank = null;
-      if (!firebaseReady || !db) {
-        render();
-        return;
-      }
 
-      try {
-        if (userDocId) {
-          // fetch by id
-          const doc = await db.collection('leaderboard').doc(userDocId).get();
-          if (doc.exists) {
-            const data = doc.data();
-            currentUserRank = (data.rank || 'NONE').toUpperCase();
-            // keep local userDocId in sync
-            userDocId = doc.id;
-            localStorage.setItem('userDocId', userDocId);
-          }
+    function fetchLeaderboard() {
+        // Fetch all scores, ordered by score descending, limited to top 50
+        dbRef.orderByChild('score').limitToLast(50).once('value', function(snapshot) {
+            var scores = [];
+            snapshot.forEach(function (childSnapshot) {
+                scores.push(childSnapshot.val());
+            });
+            
+            // Reverse the array since orderByChild('score') sorts ascending by default
+            scores.reverse(); 
+
+            // Update the global latestScores variable and display the list
+            updateLeaderboard(scores); 
+        });
+    }
+
+    // --- MODIFIED FUNCTION TO DISPLAY RANKS ---
+    function updateLeaderboard(scores) {
+        var leaderboardList = $('#leaderboard ul');
+        leaderboardList.empty(); 
+
+        // Save the scores globally in case ranks update later
+        latestScores = scores; 
+
+        if (scores.length === 0) {
+            leaderboardList.append('<li>No scores yet!</li>');
+            return;
+        }
+
+        scores.forEach(function (score) {
+            let tagHtml = '';
+            
+            // 1. LOOK UP THE RANK FROM THE FIREBASE-LOADED userRanks NODE
+            const rankData = getUserRank(score.username);
+            
+            // 2. Check if a rank was found and it's not empty
+            if (rankData.label && rankData.label.length > 0) {
+                // Create a <span> for the custom tag with the specified color
+                tagHtml = `<span style="font-weight: bold; color: ${rankData.color};">[${rankData.label}]</span> `;
+            }
+            
+            // Assemble the final list item: [RANK] Username - $Score
+            var listItem = `<li>${tagHtml}${score.username} - $${score.score.toFixed(2)}</li>`;
+            leaderboardList.append(listItem);
+        });
+    }
+    // --- END MODIFIED FUNCTION ---
+
+
+    // --- UTILITY/MODAL FUNCTIONS ---
+
+    function saveUsername() {
+        let newName = $('#new-username-input').val().trim();
+        if (newName) {
+            username = newName;
+            localStorage.setItem('simulatorUsername', username);
+            updateDisplay();
+            closeModal('settings-modal');
         } else {
-          // search by username
-          const snapshot = await db.collection('leaderboard').where('username', '==', username).limit(1).get();
-          if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            const data = doc.data();
-            currentUserRank = (data.rank || 'NONE').toUpperCase();
-            userDocId = doc.id;
-            localStorage.setItem('userDocId', userDocId);
-          }
+            alert("Username cannot be empty.");
         }
-      } catch (error) {
-        console.error('❌ Error loading user profile:', error);
-      } finally {
-        render();
-      }
     }
 
-    // Submit or update score in Firestore
-    async function submitOrUpdateScore(usernameArg, score) {
-      if (!firebaseReady || !db) return;
-
-      try {
-        const today = new Date().toDateString();
-        
-        // Check if user already has an entry
-        const snapshot = await db.collection('leaderboard')
-          .where('username', '==', usernameArg)
-          .limit(1)
-          .get();
-
-        if (!snapshot.empty) {
-          // Update existing entry
-          const doc = snapshot.docs[0];
-          const data = doc.data();
-          
-          // Update games played and wins
-          const gamesPlayed = (data.gamesPlayed || 0) + 1;
-          const wins = (data.wins || 0) + (score > INITIAL_CASH ? 1 : 0);
-          const totalProfit = (data.totalProfit || 0) + (score - INITIAL_CASH);
-          
-          // Calculate streak
-          const lastPlayedDate = data.lastPlayedDate || '';
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayStr = yesterday.toDateString();
-          
-          let streak = data.streak || 0;
-          if (lastPlayedDate === yesterdayStr) {
-            streak += 1; // Played yesterday, continue streak
-          } else if (lastPlayedDate === today) {
-            // Already played today, keep same streak
-          } else {
-            streak = 1; // Streak broken, start new
-          }
-          
-          // Track best day
-          const bestDay = Math.max(data.bestDay || 0, score);
-
-          // IMPORTANT: Do NOT overwrite rank if it exists on the doc.
-          // We intentionally do not set a 'rank' field here so manual rank changes in Firestore remain intact.
-          await doc.ref.update({
-            score: Math.max(data.score || 0, score), // Keep highest score
-            gamesPlayed: gamesPlayed,
-            wins: wins,
-            totalProfit: totalProfit,
-            bestDay: bestDay,
-            streak: streak,
-            lastPlayedDate: today,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          userDocId = doc.id;
-          localStorage.setItem('userDocId', userDocId);
-          console.log('✅ Score updated in Firebase!');
-        } else {
-          // Create new entry - default rank NONE (admins can later edit the doc to set rank)
-          const docRef = await db.collection('leaderboard').add({
-            username: usernameArg,
-            score: score,
-            gamesPlayed: 1,
-            wins: score > INITIAL_CASH ? 1 : 0,
-            totalProfit: score - INITIAL_CASH,
-            bestDay: score,
-            streak: 1,
-            lastPlayedDate: today,
-            rank: 'NONE', // default - can be changed manually in Firestore to assign prefixes
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          userDocId = docRef.id;
-          localStorage.setItem('userDocId', userDocId);
-          console.log('✅ Score submitted to Firebase!');
+    function showModal(id) {
+        document.getElementById(id).style.display = "block";
+        if (id === 'leaderboard-modal') {
+            fetchLeaderboard(); // Fetch the latest scores when the modal opens
         }
-      } catch (error) {
-        console.error('❌ Error submitting/updating score:', error);
-      }
     }
 
-    // ------------------------------
-    // UI Event Listeners for Leaderboard + Settings
-    // ------------------------------
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-      document.getElementById('leaderboardModal').classList.add('active');
-      await loadLeaderboard();
-    });
+    function closeModal(id) {
+        document.getElementById(id).style.display = "none";
+    }
 
-    document.getElementById('closeLeaderboardBtn').addEventListener('click', () => {
-      document.getElementById('leaderboardModal').classList.remove('active');
-    });
-
-    document.getElementById('settingsBtn').addEventListener('click', async () => {
-      document.getElementById('settingsModal').classList.add('active');
-      els.usernameInput.value = username;
-      // ensure we have latest rank info for display
-      await loadCurrentUserProfile();
-    });
-
-    document.getElementById('closeSettingsBtn').addEventListener('click', () => {
-      document.getElementById('settingsModal').classList.remove('active');
-      els.usernameError.textContent = '';
-    });
-
-    // Save username and attempt to update Firestore doc username (if one exists)
-    document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
-      const newName = els.usernameInput.value.trim();
-      if (!newName) {
-        els.usernameError.textContent = 'Username cannot be empty.';
-        return;
-      }
-      if (newName.length < 2) {
-        els.usernameError.textContent = 'Choose a longer name.';
-        return;
-      }
-      // clear error
-      els.usernameError.textContent = '';
-
-      // update local
-      username = newName;
-      localStorage.setItem('username', username);
-
-      // If we already have a userDocId, update the username field in Firestore to keep things consistent
-      if (firebaseReady && db && userDocId) {
-        try {
-          await db.collection('leaderboard').doc(userDocId).update({
-            username: username,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          showToast('Username saved and synced to Firebase.');
-        } catch (error) {
-          console.error('❌ Error updating username in Firebase:', error);
-          showToast('Saved locally. Failed to sync to Firebase.');
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = "none";
         }
-      } else {
-        showToast('Username saved locally.');
-      }
+    }
 
-      // Refresh user profile to pick up any rank info linked to this username
-      await loadCurrentUserProfile();
-
-      // update UI and close
-      render();
-      document.getElementById('settingsModal').classList.remove('active');
+    // Initial setup
+    $(document).ready(function() {
+        updateDisplay();
+        $('#new-username-input').val(username); // Pre-fill settings input
     });
+</script>
 
-    // Small helper: on load, fetch user's profile (to pick up rank) and render
-    (async function init() {
-      await loadCurrentUserProfile();
-      render();
-    })();
-
-    // Optional: allow leaderboard modal to refresh by clicking inside (helpful during testing)
-    document.getElementById('leaderboardList').addEventListener('click', loadLeaderboard);
-
-    // Render initially
-    render();
-
-    // End of script
-  </script>
 </body>
 </html>
