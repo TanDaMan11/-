@@ -19,69 +19,6 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
       padding: 20px;
-      transition: background 0.5s ease;
-    }
-
-    /* ========== THEME BACKGROUNDS ========== */
-    /* Dark Theme - Animated dark gradient */
-    body.dark {
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-      background-size: 200% 200%;
-      animation: gradientShift 10s ease infinite;
-    }
-
-    /* Light Theme - Soft pastel */
-    body.light {
-      background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-    }
-
-    /* Neon Theme - Vibrant animated neon */
-    body.neon {
-      background: linear-gradient(135deg, #ff0080 0%, #7928ca 50%, #ff0080 100%);
-      background-size: 200% 200%;
-      animation: gradientShift 8s ease infinite;
-    }
-
-    /* Retro Theme - 80s style animated gradient */
-    body.retro {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
-      background-size: 200% 200%;
-      animation: gradientShift 12s ease infinite;
-    }
-
-    /* Gradient animation for moving backgrounds */
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    /* Particle effect overlay for neon theme */
-    body.neon::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: 
-        radial-gradient(circle at 20% 50%, rgba(255, 0, 128, 0.3) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(121, 40, 202, 0.3) 0%, transparent 50%),
-        radial-gradient(circle at 40% 20%, rgba(255, 0, 128, 0.2) 0%, transparent 50%);
-      animation: particleFloat 15s ease infinite;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    @keyframes particleFloat {
-      0%, 100% { opacity: 0.5; transform: translateY(0px); }
-      50% { opacity: 0.8; transform: translateY(-20px); }
-    }
-
-    /* Ensure content stays above background effects */
-    .container {
-      position: relative;
-      z-index: 1;
     }
 
     .container {
@@ -760,22 +697,9 @@
     let dayEnded = false;
     let username = localStorage.getItem('username') || 'Guest' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     let userDocId = localStorage.getItem('userDocId') || null;
-    let currentTheme = localStorage.getItem('theme') || 'default'; // Theme persistence
     
     if (!localStorage.getItem('username')) {
       localStorage.setItem('username', username);
-    }
-
-    // ========== APPLY SAVED THEME ON LOAD ==========
-    // Remove all theme classes first
-    document.body.classList.remove('dark', 'light', 'neon', 'retro');
-    // Apply saved theme if not default
-    if (currentTheme !== 'default') {
-      document.body.classList.add(currentTheme);
-    }
-    // Set dropdown to saved theme
-    if (document.getElementById('themeSelect')) {
-      document.getElementById('themeSelect').value = currentTheme;
     }
 
     // DOM Elements
@@ -1200,32 +1124,10 @@
       document.getElementById('settingsModal').classList.add('active');
       els.usernameInput.value = '';
       els.usernameError.textContent = '';
-      // ========== SET THEME DROPDOWN TO CURRENT THEME ==========
-      document.getElementById('themeSelect').value = currentTheme;
     });
 
     document.getElementById('closeSettingsBtn').addEventListener('click', () => {
       document.getElementById('settingsModal').classList.remove('active');
-    });
-
-    // ========== THEME SELECTOR CHANGE HANDLER ==========
-    // When user selects a new theme from dropdown
-    document.getElementById('themeSelect').addEventListener('change', (e) => {
-      const newTheme = e.target.value;
-      
-      // Remove all theme classes
-      document.body.classList.remove('dark', 'light', 'neon', 'retro');
-      
-      // Apply new theme if not default
-      if (newTheme !== 'default') {
-        document.body.classList.add(newTheme);
-      }
-      
-      // Save theme to localStorage for persistence
-      currentTheme = newTheme;
-      localStorage.setItem('theme', newTheme);
-      
-      console.log('Theme changed to:', newTheme);
     });
 
     // My Profile button in settings
