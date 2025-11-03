@@ -189,14 +189,6 @@
       box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
     }
 
-    .time-indicator {
-      text-align: center;
-      font-size: 0.9rem;
-      color: #666;
-      margin-bottom: 15px;
-      font-weight: 500;
-    }
-
     .toast {
       position: fixed;
       right: 20px;
@@ -247,7 +239,7 @@
     .modal-content {
       background: white;
       border-radius: 24px;
-      padding: 40px;
+      padding: 50px;
       max-width: 500px;
       width: 90%;
       text-align: center;
@@ -393,12 +385,6 @@
       margin-bottom: 8px;
       border-radius: 8px;
       background: #f5f7fa;
-      transition: all 0.2s ease;
-    }
-
-    .leaderboard-item:hover {
-      transform: translateX(5px);
-      background: #e2e8f0;
     }
 
     .leaderboard-item.current-user {
@@ -476,104 +462,40 @@
       color: #667eea;
     }
 
-    .settings-menu {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
+    /* ========== RANK BADGES ========== */
+    .rank-prefix {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
-    .settings-menu-btn {
-      padding: 20px;
-      background: linear-gradient(135deg, #f5f7fa 0%, #e2e8f0 100%);
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #2d3748;
-      text-transform: none;
+    .rank-prefix.owner {
+      background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+      color: #000;
+      box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
     }
 
-    .settings-menu-btn:hover {
-      transform: translateX(5px);
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .settings-submenu {
-      display: none;
-    }
-
-    .settings-submenu.active {
-      display: block;
-    }
-
-    .color-scheme-btn {
-      padding: 15px;
-      border: 2px solid #e2e8f0;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-weight: 600;
-      text-transform: none;
-    }
-
-    .color-scheme-btn:hover {
-      transform: scale(1.05);
-    }
-
-    .color-scheme-btn.active {
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-    }
-
-    .color-scheme-btn.default {
+    .rank-prefix.pro {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
     }
 
-    .color-scheme-btn.cold {
-      background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    .rank-prefix.vip {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
       color: white;
+      box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
     }
 
-    .color-scheme-btn.forest {
-      background: linear-gradient(135deg, #134e4a 0%, #059669 100%);
+    .rank-prefix.newbie {
+      background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
       color: white;
-    }
-
-    .color-scheme-btn.sunset {
-      background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
-      color: white;
-    }
-
-    .color-scheme-btn.ocean {
-      background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
-      color: white;
-    }
-
-    .firebase-status {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      z-index: 3000;
-    }
-
-    .firebase-status.connected {
-      background: #38ef7d;
-      color: white;
-    }
-
-    .firebase-status.disconnected {
-      background: #ff6a00;
-      color: white;
+      box-shadow: 0 2px 8px rgba(255, 106, 0, 0.4);
     }
   </style>
 </head>
@@ -658,7 +580,7 @@
         <div class="form-error" id="usernameError"></div>
       </div>
       <button class="modal-btn" id="saveUsernameBtn">Save Username</button>
-      <button class="modal-btn" id="closeSettingsBtn" style="background: #cbd5e0; color: #2d3748;       margin-left: 10px;">Cancel</button>
+      <button class="modal-btn" id="closeSettingsBtn" style="background: #cbd5e0; color: #2d3748; margin-left: 10px;">Cancel</button>
     </div>
   </div>
 
@@ -809,13 +731,30 @@
       els.currentUsername.textContent = username;
       priceChart.update();
       
-      // Update button text based on day status
       const tickBtn = document.getElementById('tick');
       if (dayEnded) {
         tickBtn.textContent = 'End Day';
       } else {
         tickBtn.textContent = 'Next 30 Minutes';
       }
+    }
+
+    // ========== RANK BADGE HELPER FUNCTION ==========
+    // Call this to generate rank badge HTML
+    function getRankBadge(rank) {
+      if (!rank) return '';
+      
+      const ranks = {
+        'owner': { label: 'OWNER', class: 'owner' },
+        'pro': { label: 'PRO', class: 'pro' },
+        'vip': { label: 'VIP', class: 'vip' },
+        'newbie': { label: 'NEWBIE', class: 'newbie' }
+      };
+      
+      const rankData = ranks[rank.toLowerCase()];
+      if (!rankData) return '';
+      
+      return `<span class="rank-prefix ${rankData.class}">${rankData.label}</span>`;
     }
 
     // Game Actions
@@ -861,7 +800,6 @@
     });
 
     document.getElementById('tick').addEventListener('click', () => {
-      // If day has ended, just show the modal again
       if (dayEnded) {
         document.getElementById('endDayModal').classList.add('active');
         return;
@@ -881,7 +819,6 @@
           highscore = portfolio;
           localStorage.setItem('highscore', highscore.toString());
           
-          // Submit/Update to Firebase
           if (firebaseReady && db) {
             submitOrUpdateScore(username, highscore);
           }
@@ -893,11 +830,9 @@
         els.modalPortfolio.textContent = portfolio.toFixed(2);
         els.modalHighscore.textContent = highscore.toFixed(2);
         els.modalProfit.className = 'modal-stat profit ' + (profit > 0 ? 'positive' : profit < 0 ? 'negative' : '');
-        els.modalProfit.textContent = `Profit/Loss: ${profit.toFixed(2)} (${profitPercent}%)`;
+        els.modalProfit.textContent = `Profit/Loss: $${profit.toFixed(2)} (${profitPercent}%)`;
         
-        // Update button text in modal
         document.getElementById('continueBtn').textContent = 'Start New Day';
-        
         document.getElementById('endDayModal').classList.add('active');
       }
       
@@ -907,7 +842,6 @@
     document.getElementById('continueBtn').addEventListener('click', () => {
       document.getElementById('endDayModal').classList.remove('active');
       
-      // Reset for new day
       cash = INITIAL_CASH;
       shares = 0;
       price = 50;
@@ -916,25 +850,21 @@
       priceChart.data.labels = [timeLabels[0]];
       priceChart.data.datasets[0].data = [price];
       
-      // Reset button text
       document.getElementById('continueBtn').textContent = 'Continue Trading';
-      
       render();
     });
 
-    // Leaderboard
+    // Firebase Functions
     async function submitOrUpdateScore(username, score) {
       if (!firebaseReady || !db) return;
 
       try {
-        // Check if user already has an entry
         const snapshot = await db.collection('leaderboard')
           .where('username', '==', username)
           .limit(1)
           .get();
 
         if (!snapshot.empty) {
-          // Update existing entry - only update score if higher
           const doc = snapshot.docs[0];
           const data = doc.data();
           
@@ -943,13 +873,12 @@
               score: score,
               timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-            console.log('✅ Score updated in Firebase!');
+            console.log('✅ Score updated!');
           }
           
           userDocId = doc.id;
           localStorage.setItem('userDocId', userDocId);
         } else {
-          // Create new entry
           const docRef = await db.collection('leaderboard').add({
             username: username,
             score: score,
@@ -957,16 +886,15 @@
           });
           userDocId = docRef.id;
           localStorage.setItem('userDocId', userDocId);
-          console.log('✅ Score submitted to Firebase!');
+          console.log('✅ Score submitted!');
         }
       } catch (error) {
-        console.error('❌ Error submitting/updating score:', error);
+        console.error('❌ Error submitting score:', error);
       }
     }
 
     async function loadLeaderboard() {
       const list = document.getElementById('leaderboardList');
-      const podium = document.getElementById('podium');
       
       if (!firebaseReady || !db) {
         list.innerHTML = '<li class="leaderboard-item">Firebase not connected</li>';
@@ -980,9 +908,10 @@
           .get();
         
         const scores = [];
-        snapshot.forEach(doc => scores.push(doc.data()));
+        snapshot.forEach(doc => {
+          scores.push(doc.data());
+        });
 
-        // Keep highest score per username
         const userScores = {};
         scores.forEach(entry => {
           if (!userScores[entry.username] || entry.score > userScores[entry.username].score) {
@@ -994,7 +923,7 @@
         displayLeaderboard(sorted);
       } catch (error) {
         console.error('❌ Leaderboard error:', error);
-        list.innerHTML = '<li class="leaderboard-item">Error loading: ' + error.message + '</li>';
+        list.innerHTML = '<li class="leaderboard-item">Error: ' + error.message + '</li>';
       }
     }
 
@@ -1006,11 +935,11 @@
       list.innerHTML = '';
 
       if (scores.length === 0) {
-        list.innerHTML = '<li class="leaderboard-item">No scores yet. Be the first!</li>';
+        list.innerHTML = '<li class="leaderboard-item">No scores yet!</li>';
         return;
       }
 
-      // Podium
+      // Podium (top 3)
       const podiumData = [
         { rank: 2, class: 'second', data: scores[1] },
         { rank: 1, class: 'first', data: scores[0] },
@@ -1021,19 +950,18 @@
         if (data) {
           const place = document.createElement('div');
           place.className = `podium-place ${cls}`;
-          // ========== ADD RANK PREFIX TO PODIUM ==========
-          const rankBadge = getRankBadgeHTML(data.rank);
+          const badge = getRankBadge(data.rank);
           place.innerHTML = `
             <div class="podium-rank">#${rank}</div>
-            <div class="podium-name">${rankBadge}${data.username}</div>
-            <div class="podium-score">${data.score.toFixed(2)}</div>
+            <div class="podium-name">${badge}${data.username}</div>
+            <div class="podium-score">${(data.score || 0).toFixed(2)}</div>
             <div class="podium-base"></div>
           `;
           podium.appendChild(place);
         }
       });
 
-      // Top 10 List
+      // Top 10 list
       const top10 = scores.slice(0, 10);
       const userRank = scores.findIndex(s => s.username === username) + 1;
 
@@ -1049,10 +977,11 @@
 
         const item = document.createElement('li');
         item.className = cls;
+        const badge = getRankBadge(entry.rank);
         item.innerHTML = `
           <span class="leaderboard-rank">#${rank}</span>
-          <span class="leaderboard-name">${entry.username}</span>
-          <span class="leaderboard-score">${entry.score.toFixed(2)}</span>
+          <span class="leaderboard-name">${badge}${entry.username}</span>
+          <span class="leaderboard-score">${(entry.score || 0).toFixed(2)}</span>
         `;
         list.appendChild(item);
       });
@@ -1063,10 +992,11 @@
         const item = document.createElement('li');
         item.className = 'leaderboard-item current-user';
         item.style.marginTop = '20px';
+        const badge = getRankBadge(userEntry.rank);
         item.innerHTML = `
           <span class="leaderboard-rank">#${userRank}</span>
-          <span class="leaderboard-name">${userEntry.username}</span>
-          <span class="leaderboard-score">${userEntry.score.toFixed(2)}</span>
+          <span class="leaderboard-name">${badge}${userEntry.username}</span>
+          <span class="leaderboard-score">${(userEntry.score || 0).toFixed(2)}</span>
         `;
         list.appendChild(item);
       }
@@ -1092,63 +1022,6 @@
       document.getElementById('settingsModal').classList.remove('active');
     });
 
-    // My Profile button in settings
-    document.getElementById('myProfileBtn').addEventListener('click', async () => {
-      document.getElementById('settingsModal').classList.remove('active');
-      document.getElementById('leaderboardModal').classList.add('active');
-      
-      // Load current user's data
-      if (firebaseReady && db) {
-        try {
-          const snapshot = await db.collection('leaderboard')
-            .where('username', '==', username)
-            .limit(1)
-            .get();
-          
-          if (!snapshot.empty) {
-            const userData = snapshot.docs[0].data();
-            showProfile(userData);
-          } else {
-            // User hasn't played yet, show empty profile
-            showProfile({
-              username: username,
-              score: 0,
-              gamesPlayed: 0,
-              wins: 0,
-              totalProfit: 0,
-              bestDay: 0,
-              streak: 0
-            });
-          }
-        } catch (error) {
-          console.error('Error loading profile:', error);
-        }
-      }
-    });
-
-    // Color scheme buttons
-    document.querySelectorAll('.color-scheme-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const theme = btn.dataset.theme;
-        
-        // Remove all theme classes
-        document.body.classList.remove('cold', 'forest', 'sunset', 'ocean');
-        
-        // Add new theme if not default
-        if (theme !== 'default') {
-          document.body.classList.add(theme);
-        }
-        
-        // Update active state
-        document.querySelectorAll('.color-scheme-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        // Save theme
-        currentTheme = theme;
-        localStorage.setItem('theme', theme);
-      });
-    });
-
     document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
       const newUsername = els.usernameInput.value.trim();
       
@@ -1163,11 +1036,10 @@
       }
 
       if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
-        els.usernameError.textContent = 'Only letters, numbers, and underscores allowed';
+        els.usernameError.textContent = 'Only letters, numbers, and underscores';
         return;
       }
 
-      // Check if username is taken
       if (firebaseReady && db) {
         try {
           const snapshot = await db.collection('leaderboard')
@@ -1180,7 +1052,6 @@
             return;
           }
 
-          // Update username in database if user has an entry
           if (userDocId) {
             await db.collection('leaderboard').doc(userDocId).update({
               username: newUsername
@@ -1192,14 +1063,11 @@
         }
       }
 
-      const oldUsername = username;
       username = newUsername;
       localStorage.setItem('username', username);
       els.currentUsername.textContent = username;
       document.getElementById('settingsModal').classList.remove('active');
       showToast('Username updated!');
-      
-      console.log(`Username changed from ${oldUsername} to ${username}`);
     });
 
     // Close modals on overlay click
