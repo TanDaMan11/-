@@ -527,6 +527,128 @@
       0%, 100% { box-shadow: 0 2px 8px rgba(142, 68, 173, 0.4); }
       50% { box-shadow: 0 4px 16px rgba(142, 68, 173, 0.8); }
     }
+
+    /* ========== ANIMATED BACKGROUNDS ========== */
+    .bg-buildings {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      /* Placeholder for actual animated buildings background */
+    }
+
+    .bg-matrix {
+      background-color: #000;
+      overflow: hidden;
+      /* Placeholder for actual matrix rain animation */
+    }
+
+    /* ========== SHOP STYLES ========== */
+    .shop-section {
+      margin-bottom: 30px;
+    }
+
+    .shop-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-align: left;
+      margin-bottom: 15px;
+      color: #2d3748;
+    }
+
+    .shop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 15px;
+    }
+
+    .shop-item {
+      background: #f5f7fa;
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+      border: 2px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .shop-item:hover {
+      transform: translateY(-3px);
+      border-color: #667eea;
+    }
+
+    .shop-item-name {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    .shop-item-price {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #667eea;
+      margin-bottom: 15px;
+    }
+
+    .buy-btn {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      color: white;
+      width: 100%;
+      padding: 10px;
+      font-size: 0.9rem;
+    }
+
+    .buy-btn:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+
+    /* ========== WHEEL STYLES ========== */
+    .wheel-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      margin: 0 auto 20px;
+    }
+
+    .wheel {
+      width: 100%;
+      height: 100%;
+      background: conic-gradient(
+        #ff6b6b 0% 12.5%,
+        #f06595 12.5% 25%,
+        #cc5de8 25% 37.5%,
+        #845ef7 37.5% 50%,
+        #5c7cfa 50% 62.5%,
+        #339af0 62.5% 75%,
+        #22b8cf 75% 87.5%,
+        #20c997 87.5% 100%
+      );
+      border-radius: 50%;
+      border: 5px solid white;
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
+      transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    .wheel-marker {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-top: 20px solid #e74c3c;
+    }
+
+    .wheel-input-group {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    #wagerInput {
+      width: 100px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -534,6 +656,8 @@
     <div class="header">
       <h1>Trade Simulator</h1>
       <div class="header-buttons">
+        <button class="icon-btn" id="helpBtn" title="Help">❓</button>
+        <button class="icon-btn" id="shopBtn" title="Shop">🛒</button>
         <button class="icon-btn" id="leaderboardBtn" title="Leaderboard">🏆</button>
         <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
       </div>
@@ -614,6 +738,78 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="shopModal">
+    <div class="modal-content">
+      <div class="modal-title">🛒 Shop</div>
+      <div class="modal-stat">Your Tokens: <strong>🪙 <span id="shopTokens">0</span></strong></div>
+      <button class="modal-btn" id="claimFreebieBtn">Claim Daily Freebie (10 Tokens)</button>
+      <hr style="margin: 30px 0; border: 1px solid #e2e8f0;">
+
+      <!-- Ranks Section -->
+      <div class="shop-section">
+        <h3 class="shop-title">Ranks</h3>
+        <div class="shop-grid">
+          <div class="shop-item">
+            <div class="shop-item-name"><span class="rank-prefix noob">NOOB</span></div>
+            <div class="shop-item-price">1 Token</div>
+            <button class="buy-btn" id="buyNoobRank">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-name"><span class="rank-prefix member">MEMBER</span></div>
+            <div class="shop-item-price">50 Tokens</div>
+            <button class="buy-btn" id="buyMemberRank">Buy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backgrounds Section -->
+      <div class="shop-section">
+        <h3 class="shop-title">Backgrounds</h3>
+        <div class="shop-grid">
+          <div class="shop-item">
+            <div class="shop-item-name">Animated Buildings</div>
+            <div class="shop-item-price">150 Tokens</div>
+            <button class="buy-btn" id="buyBuildingsBg">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-name">Matrix Rain</div>
+            <div class="shop-item-price">200 Tokens</div>
+            <button class="buy-btn" id="buyMatrixBg">Buy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wheel Section -->
+      <div class="shop-section">
+        <h3 class="shop-title">Gambling Wheel</h3>
+        <div class="wheel-container">
+          <div class="wheel" id="wheel"></div>
+          <div class="wheel-marker"></div>
+        </div>
+        <div class="wheel-input-group">
+          <input type="number" id="wagerInput" class="form-input" placeholder="Wager (10+)" step="10" min="10">
+          <button class="modal-btn" id="spinBtn" style="margin-top: 0;">Spin</button>
+        </div>
+      </div>
+
+      <!-- Powerups Section -->
+      <div class="shop-section">
+        <h3 class="shop-title">Powerups</h3>
+        <div class="shop-grid">
+        </div>
+      </div>
+
+      <button class="modal-btn" id="closeShopBtn" style="background: #cbd5e0; color: #2d3748; margin-top: 10px;">Close</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal-content" style="text-align: left;">
+      <div class="modal-title">❓ Help</div>
+      <button class="modal-btn" id="closeHelpBtn" style="background: #cbd5e0; color: #2d3748; margin-top: 0;">Close</button>
+    </div>
+  </div>
+
   <script>
     // Firebase Configuration
     const firebaseConfig = {
@@ -648,10 +844,21 @@
     let dayEnded = false;
     let username = localStorage.getItem('username') || 'Guest' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     let userDocId = localStorage.getItem('userDocId') || null;
+    let tokens = parseInt(localStorage.getItem('tokens') || '0');
+    let rank = localStorage.getItem('rank') || null;
+    let background = localStorage.getItem('background') || 'default';
+    let purchasedItems = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
     
     if (!localStorage.getItem('username')) {
       localStorage.setItem('username', username);
     }
+
+    const shopItems = {
+      'buyNoobRank': { name: 'Noob Rank', price: 1, type: 'rank', value: 'noob' },
+      'buyMemberRank': { name: 'Member Rank', price: 50, type: 'rank', value: 'member' },
+      'buyBuildingsBg': { name: 'Animated Buildings BG', price: 150, type: 'background', value: 'buildings' },
+      'buyMatrixBg': { name: 'Matrix Rain BG', price: 200, type: 'background', value: 'matrix' },
+    };
 
     // DOM Elements
     const els = {
@@ -664,7 +871,12 @@
       modalProfit: document.getElementById('modalProfit'),
       modalHighscore: document.getElementById('modalHighscore'),
       usernameInput: document.getElementById('usernameInput'),
-      usernameError: document.getElementById('usernameError')
+      usernameError: document.getElementById('usernameError'),
+      shopTokens: document.getElementById('shopTokens'),
+      claimFreebieBtn: document.getElementById('claimFreebieBtn'),
+      wheel: document.getElementById('wheel'),
+      wagerInput: document.getElementById('wagerInput'),
+      spinBtn: document.getElementById('spinBtn')
     };
 
     // Chart Setup
@@ -758,9 +970,12 @@
       els.shares.textContent = shares;
       els.price.textContent = price.toFixed(2);
       els.highscore.textContent = highscore.toFixed(2);
-      els.currentUsername.textContent = username;
+      els.currentUsername.innerHTML = `${getRankBadge(rank)} ${username}`;
+      els.shopTokens.textContent = tokens;
       priceChart.update();
       
+      document.body.className = `bg-${background}`;
+
       const tickBtn = document.getElementById('tick');
       if (dayEnded) {
         tickBtn.textContent = 'End Day';
@@ -790,6 +1005,114 @@
       
       return `<span class="rank-prefix ${rankData.class}">${rankData.label}</span>`;
     }
+
+    // Shop Logic
+    function buyItem(itemId) {
+      const item = shopItems[itemId];
+      if (!item) return;
+
+      if (tokens >= item.price) {
+        tokens -= item.price;
+        localStorage.setItem('tokens', tokens.toString());
+
+        if (item.type === 'rank') {
+          rank = item.value;
+          localStorage.setItem('rank', rank);
+        } else if (item.type === 'background') {
+          background = item.value;
+          localStorage.setItem('background', background);
+        }
+
+        purchasedItems.push(itemId);
+        localStorage.setItem('purchasedItems', JSON.stringify(purchasedItems));
+
+        showToast(`You purchased the ${item.name}!`);
+        updateShopButtons();
+        render();
+      } else {
+        showToast('Not enough tokens!');
+      }
+    }
+
+    function updateShopButtons() {
+      for (const itemId in shopItems) {
+        const btn = document.getElementById(itemId);
+        if (btn) {
+          if (purchasedItems.includes(itemId)) {
+            btn.disabled = true;
+            btn.textContent = 'Purchased';
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'Buy';
+          }
+        }
+      }
+    }
+
+    Object.keys(shopItems).forEach(itemId => {
+      const btn = document.getElementById(itemId);
+      if (btn) {
+        btn.addEventListener('click', () => buyItem(itemId));
+      }
+    });
+
+    // Wheel Logic
+    const wheelSegments = [
+      { multiplier: 1.5, label: '1.5x' },
+      { multiplier: 0.5, label: '0.5x' },
+      { multiplier: 2, label: '2x' },
+      { multiplier: 0.7, label: '0.7x' },
+      { multiplier: 1.2, label: '1.2x' },
+      { multiplier: 0.3, label: '0.3x' },
+      { multiplier: 3, label: '3x' },
+      { multiplier: 0, label: 'LOSE' },
+    ];
+    let isSpinning = false;
+
+    function spinWheel() {
+      if (isSpinning) return;
+
+      const wager = parseInt(els.wagerInput.value);
+      if (isNaN(wager) || wager <= 0 || wager % 10 !== 0) {
+        showToast('Wager must be a multiple of 10.');
+        return;
+      }
+
+      if (wager > tokens) {
+        showToast('Not enough tokens for that wager!');
+        return;
+      }
+
+      isSpinning = true;
+      tokens -= wager;
+      render();
+
+      const segmentCount = wheelSegments.length;
+      const randomSegmentIndex = Math.floor(Math.random() * segmentCount);
+      const selectedSegment = wheelSegments[randomSegmentIndex];
+      const segmentAngle = 360 / segmentCount;
+      const randomAngleWithinSegment = (Math.random() - 0.5) * (segmentAngle * 0.8);
+      const finalAngle = (randomSegmentIndex * segmentAngle) + randomAngleWithinSegment;
+      const totalRotation = 360 * 5 + finalAngle; // 5 full spins
+
+      els.wheel.style.transform = `rotate(${totalRotation}deg)`;
+
+      setTimeout(() => {
+        const winnings = Math.floor(wager * selectedSegment.multiplier);
+        tokens += winnings;
+        localStorage.setItem('tokens', tokens.toString());
+        showToast(`You won ${winnings} tokens! (x${selectedSegment.multiplier})`);
+        render();
+        isSpinning = false;
+        els.wheel.style.transition = 'none';
+        els.wheel.style.transform = `rotate(${finalAngle}deg)`;
+        setTimeout(() => {
+          els.wheel.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        }, 50);
+      }, 4000);
+    }
+
+    els.spinBtn.addEventListener('click', spinWheel);
 
     // Game Actions
     document.getElementById('buyAll').addEventListener('click', () => {
@@ -1056,6 +1379,24 @@
       document.getElementById('settingsModal').classList.remove('active');
     });
 
+    document.getElementById('helpBtn').addEventListener('click', () => {
+      document.getElementById('helpModal').classList.add('active');
+    });
+
+    document.getElementById('closeHelpBtn').addEventListener('click', () => {
+      document.getElementById('helpModal').classList.remove('active');
+    });
+
+    document.getElementById('shopBtn').addEventListener('click', () => {
+      document.getElementById('shopModal').classList.add('active');
+      updateShopButtons();
+      updateFreebieButton();
+    });
+
+    document.getElementById('closeShopBtn').addEventListener('click', () => {
+      document.getElementById('shopModal').classList.remove('active');
+    });
+
     document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
       const newUsername = els.usernameInput.value.trim();
       
@@ -1104,6 +1445,35 @@
       showToast('Username updated!');
     });
 
+    // Daily Freebie Logic
+    function updateFreebieButton() {
+      const lastClaimed = localStorage.getItem('lastClaimed');
+      const today = new Date().toDateString();
+      if (lastClaimed === today) {
+        els.claimFreebieBtn.disabled = true;
+        els.claimFreebieBtn.textContent = 'Claimed Today';
+      } else {
+        els.claimFreebieBtn.disabled = false;
+        els.claimFreebieBtn.textContent = 'Claim Daily Freebie (10 Tokens)';
+      }
+    }
+
+    els.claimFreebieBtn.addEventListener('click', () => {
+      const lastClaimed = localStorage.getItem('lastClaimed');
+      const today = new Date().toDateString();
+
+      if (lastClaimed !== today) {
+        tokens += 10;
+        localStorage.setItem('tokens', tokens.toString());
+        localStorage.setItem('lastClaimed', today);
+        showToast('You claimed 10 free tokens!');
+        updateFreebieButton();
+        render();
+      } else {
+        showToast('You have already claimed your freebie today.');
+      }
+    });
+
     // Close modals on overlay click
     document.querySelectorAll('.modal-overlay').forEach(modal => {
       modal.addEventListener('click', e => {
@@ -1113,6 +1483,7 @@
 
     // Initialize
     render();
+    updateShopButtons();
     console.log('🎮 Game loaded! Username:', username);
   </script>
 </body>
