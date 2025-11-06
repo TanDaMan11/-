@@ -1,10 +1,10 @@
-
-<!doctype html>
-<html>
-<head>
+<html><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trade Simulator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -490,16 +490,52 @@
       box-shadow: 0 2px 8px rgba(52, 152, 219, 0.4);
     }
 
-    .rank-prefix.member {
-      background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+    .rank-prefix.pro {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      box-shadow: 0 2px 8px rgba(149, 165, 166, 0.4);
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .rank-prefix.vip {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
+    }
+
+    .rank-prefix.member {
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(52, 152, 219, 0.4);
+    }
+
+    .rank-prefix.pro {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .rank-prefix.elite {
+      background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
+      color: #000;
+      box-shadow: 0 2px 8px rgba(241, 196, 15, 0.4);
+    }
+
+    .rank-prefix.master {
+      background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(39, 174, 96, 0.4);
+    }
+
+    .rank-prefix.vip {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
     }
 
     .rank-prefix.noob {
-      background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
+      background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
       color: white;
-      box-shadow: 0 2px 8px rgba(255, 106, 0, 0.4);
+      box-shadow: 0 2px 8px rgba(149, 165, 166, 0.4);
     }
 
     .rank-prefix.legend {
@@ -635,27 +671,9 @@
       width: 100px;
       text-align: center;
     }
-
-    .trade-offer-section {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
-
-    .trade-offer-side {
-      width: 100%;
-    }
-
-    .trade-items {
-      background: #f5f7fa;
-      border-radius: 8px;
-      padding: 10px;
-      min-height: 100px;
-      margin-bottom: 10px;
-    }
   </style>
 </head>
-<body>
+<body class="bg-default">
   <div class="container">
     <div class="header">
       <h1>Trade Simulator</h1>
@@ -669,7 +687,7 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">Cash</div>
-        <div class="stat-value">$<span id="cash">1000</span></div>
+        <div class="stat-value">$<span id="cash">1000.00</span></div>
       </div>
       
       <div class="stat-card">
@@ -679,20 +697,20 @@
       
       <div class="stat-card">
         <div class="stat-label">Market Price</div>
-        <div class="stat-value">$<span id="price">50</span></div>
+        <div class="stat-value">$<span id="price">50.00</span></div>
       </div>
       
       <div class="stat-card highlight">
         <div class="stat-label">🏆 Highscore</div>
-        <div class="stat-value">$<span id="highscore">0</span></div>
+        <div class="stat-value">$<span id="highscore">890.14</span></div>
       </div>
     </div>
 
     <div class="chart-container">
-      <canvas id="priceChart"></canvas>
+      <canvas id="priceChart" width="998" height="600" style="display: block; box-sizing: border-box; height: 300px; width: 499px;"></canvas>
     </div>
 
-    <div class="controllers">
+    <div class="controls">
       <button id="buyAll">Buy All</button>
       <button id="buy">Buy 1</button>
       <button id="sell">Sell 1</button>
@@ -716,10 +734,63 @@
   <div class="modal-overlay" id="leaderboardModal">
     <div class="modal-content">
       <div class="modal-title">🏆 Leaderboard</div>
-      <div class="podium" id="podium"></div>
-      <ul class="leaderboard-list" id="leaderboardList">
-        <li class="leaderboard-item">Loading...</li>
-      </ul>
+      <div class="podium" id="podium"><div class="podium-place second">
+            <div class="podium-rank">#2</div>
+            <div class="podium-name"><span class="rank-prefix pro">PRO</span>blah</div>
+            <div class="podium-score">1302.75</div>
+            <div class="podium-base"></div>
+          </div><div class="podium-place first">
+            <div class="podium-rank">#1</div>
+            <div class="podium-name"><span class="rank-prefix owner">OWNER</span>Tanner</div>
+            <div class="podium-score">1382.88</div>
+            <div class="podium-base"></div>
+          </div><div class="podium-place third">
+            <div class="podium-rank">#3</div>
+            <div class="podium-name"><span class="rank-prefix vip">VIP</span>nigita2</div>
+            <div class="podium-score">1299.12</div>
+            <div class="podium-base"></div>
+          </div></div>
+      <ul class="leaderboard-list" id="leaderboardList"><li class="leaderboard-item gold">
+          <span class="leaderboard-rank">#1</span>
+          <span class="leaderboard-name"><span class="rank-prefix owner">OWNER</span>Tanner</span>
+          <span class="leaderboard-score">1382.88</span>
+        </li><li class="leaderboard-item silver">
+          <span class="leaderboard-rank">#2</span>
+          <span class="leaderboard-name"><span class="rank-prefix pro">PRO</span>blah</span>
+          <span class="leaderboard-score">1302.75</span>
+        </li><li class="leaderboard-item bronze">
+          <span class="leaderboard-rank">#3</span>
+          <span class="leaderboard-name"><span class="rank-prefix vip">VIP</span>nigita2</span>
+          <span class="leaderboard-score">1299.12</span>
+        </li><li class="leaderboard-item">
+          <span class="leaderboard-rank">#4</span>
+          <span class="leaderboard-name"><span class="rank-prefix legend">LEGEND</span>Thegoat</span>
+          <span class="leaderboard-score">1269.88</span>
+        </li><li class="leaderboard-item">
+          <span class="leaderboard-rank">#5</span>
+          <span class="leaderboard-name">king_sly</span>
+          <span class="leaderboard-score">1262.74</span>
+        </li><li class="leaderboard-item">
+          <span class="leaderboard-rank">#6</span>
+          <span class="leaderboard-name"><span class="rank-prefix vip">VIP</span>Big_D</span>
+          <span class="leaderboard-score">1248.85</span>
+        </li><li class="leaderboard-item">
+          <span class="leaderboard-rank">#7</span>
+          <span class="leaderboard-name">miniblizard</span>
+          <span class="leaderboard-score">1243.01</span>
+        </li><li class="leaderboard-item">
+          <span class="leaderboard-rank">#8</span>
+          <span class="leaderboard-name">kingels</span>
+          <span class="leaderboard-score">1239.65</span>
+        </li><li class="leaderboard-item">
+          <span class="leaderboard-rank">#9</span>
+          <span class="leaderboard-name"><span class="rank-prefix member">MEMBER</span>NEEEEDDDD</span>
+          <span class="leaderboard-score">1222.52</span>
+        </li><li class="leaderboard-item">
+          <span class="leaderboard-rank">#10</span>
+          <span class="leaderboard-name"><span class="rank-prefix noob">NOOB</span>keke</span>
+          <span class="leaderboard-score">1221.84</span>
+        </li></ul>
       <button class="modal-btn" id="closeLeaderboardBtn">Close</button>
     </div>
   </div>
@@ -729,7 +800,7 @@
       <div class="modal-title">⚙️ Settings</div>
       <div class="form-group">
         <label class="form-label">Current Username</label>
-        <div class="current-username" id="currentUsername">Guest0000</div>
+        <div class="current-username" id="currentUsername"><span class="rank-prefix noob">NOOB</span> Guest3127</div>
       </div>
       <div class="form-group">
         <label class="form-label" for="usernameInput">Change Username</label>
@@ -741,13 +812,11 @@
     </div>
   </div>
 
-
-
   <div class="modal-overlay" id="shopModal">
     <div class="modal-content">
       <div class="modal-title">🛒 Shop</div>
-      <div class="modal-stat">Your Tokens: <strong>🪙 <span id="shopTokens">0</span></strong></div>
-      <button class="modal-btn" id="claimFreebieBtn">Claim Daily Freebie (10 Tokens)</button>
+      <div class="modal-stat">Your Tokens: <strong>🪙 <span id="shopTokens">1</span></strong></div>
+      <button class="modal-btn" id="claimFreebieBtn" disabled="">Claimed Today</button>
       <hr style="margin: 30px 0; border: 1px solid #e2e8f0;">
 
       <!-- Ranks Section -->
@@ -756,13 +825,33 @@
         <div class="shop-grid">
           <div class="shop-item">
             <div class="shop-item-name"><span class="rank-prefix noob">NOOB</span></div>
-            <div class="shop-item-price">1 Token</div>
-            <button class="buy-btn" id="buyNoobRank">Buy</button>
+            <div class="shop-item-price">20 Tokens</div>
+            <button class="buy-btn" id="buyNoobRank" disabled="">Purchased</button>
           </div>
           <div class="shop-item">
             <div class="shop-item-name"><span class="rank-prefix member">MEMBER</span></div>
-            <div class="shop-item-price">50 Tokens</div>
+            <div class="shop-item-price">100 Tokens</div>
             <button class="buy-btn" id="buyMemberRank">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-name"><span class="rank-prefix pro">PRO</span></div>
+            <div class="shop-item-price">300 Tokens</div>
+            <button class="buy-btn" id="buyProRank">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-name"><span class="rank-prefix elite">ELITE</span></div>
+            <div class="shop-item-price">750 Tokens</div>
+            <button class="buy-btn" id="buyEliteRank">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-name"><span class="rank-prefix master">MASTER</span></div>
+            <div class="shop-item-price">1000 Tokens</div>
+            <button class="buy-btn" id="buyMasterRank">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-name"><span class="rank-prefix legend">LEGEND</span></div>
+            <div class="shop-item-price">5000 Tokens</div>
+            <button class="buy-btn" id="buyLegendRank">Buy</button>
           </div>
         </div>
       </div>
@@ -784,64 +873,22 @@
         </div>
       </div>
 
-      <!-- Powerups Section -->
+      <!-- Wheel Section -->
       <div class="shop-section">
-        <h3 class="shop-title">Powerups</h3>
-        <div class="shop-grid">
+        <h3 class="shop-title">Gambling Wheel</h3>
+        <div class="wheel-container">
+          <div class="wheel" id="wheel"></div>
+          <div class="wheel-marker"></div>
         </div>
-      </div>
-
-      <!-- Sell Back Section -->
-      <div class="shop-section">
-        <h3 class="shop-title">Sell Back</h3>
-        <div class="form-group">
-          <label class="form-label" for="sellBackSelect">Item to Sell</label>
-          <select id="sellBackSelect" class="form-input"></select>
+        <div class="wheel-input-group">
+          <button class="modal-btn" id="wagerDownBtn" style="margin-top: 0; padding: 10px 15px;">-</button>
+          <input type="number" id="wagerInput" class="form-input" placeholder="Wager (10+)" step="10" min="10" value="10" readonly="">
+          <button class="modal-btn" id="wagerUpBtn" style="margin-top: 0; padding: 10px 15px;">+</button>
+          <button class="modal-btn" id="spinBtn" style="margin-top: 0;">Spin</button>
         </div>
-        <button class="modal-btn" id="sellBackBtn">Sell for 50% of Price</button>
       </div>
 
       <button class="modal-btn" id="closeShopBtn" style="background: #cbd5e0; color: #2d3748; margin-top: 10px;">Close</button>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="sendTokensModal">
-    <div class="modal-content">
-      <div class="modal-title">💸 Send Tokens</div>
-      <div class="form-group">
-        <label class="form-label" for="sendTokensUsernameInput">Send to (Username)</label>
-        <input type="text" id="sendTokensUsernameInput" class="form-input" placeholder="Enter username">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="sendTokensAmountInput">Amount</label>
-        <input type="number" id="sendTokensAmountInput" class="form-input" placeholder="0" min="1">
-      </div>
-      <button class="modal-btn" id="sendTokensConfirmBtn">Send Tokens</button>
-      <button class="modal-btn" id="closeSendTokensBtn" style="background: #cbd5e0; color: #2d3748; margin-left: 10px;">Cancel</button>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="tradeModal">
-    <div class="modal-content">
-      <div class="modal-title">🤝 Trade</div>
-      <div class="form-group">
-        <label class="form-label" for="tradeUsernameInput">Trade with (Username)</label>
-        <input type="text" id="tradeUsernameInput" class="form-input" placeholder="Enter username">
-      </div>
-
-      <div class="trade-offer-section">
-        <div class="trade-offer-side">
-          <h4>Your Offer</h4>
-          <div class="trade-items" id="yourTradeItems"></div>
-          <div class="form-group">
-            <label class="form-label" for="yourTradeTokens">Tokens</label>
-            <input type="number" id="yourTradeTokens" class="form-input" placeholder="0" min="0">
-          </div>
-        </div>
-      </div>
-
-      <button class="modal-btn" id="sendTradeBtn">Send Trade Offer</button>
-      <button class="modal-btn" id="closeTradeBtn" style="background: #cbd5e0; color: #2d3748; margin-left: 10px;">Cancel</button>
     </div>
   </div>
 
@@ -889,8 +936,12 @@
     }
 
     const shopItems = {
-      'buyNoobRank': { name: 'Noob Rank', price: 1, type: 'rank', value: 'noob' },
-      'buyMemberRank': { name: 'Member Rank', price: 50, type: 'rank', value: 'member' },
+      'buyNoobRank': { name: 'Noob Rank', price: 20, type: 'rank', value: 'noob' },
+      'buyMemberRank': { name: 'Member Rank', price: 100, type: 'rank', value: 'member' },
+      'buyProRank': { name: 'Pro Rank', price: 300, type: 'rank', value: 'pro' },
+      'buyEliteRank': { name: 'Elite Rank', price: 750, type: 'rank', value: 'elite' },
+      'buyMasterRank': { name: 'Master Rank', price: 1000, type: 'rank', value: 'master' },
+      'buyLegendRank': { name: 'Legend Rank', price: 5000, type: 'rank', value: 'legend' },
       'buyBuildingsBg': { name: 'Animated Buildings BG', price: 150, type: 'background', value: 'buildings' },
       'buyMatrixBg': { name: 'Matrix Rain BG', price: 200, type: 'background', value: 'matrix' },
     };
@@ -911,6 +962,8 @@
       claimFreebieBtn: document.getElementById('claimFreebieBtn'),
       wheel: document.getElementById('wheel'),
       wagerInput: document.getElementById('wagerInput'),
+      wagerDownBtn: document.getElementById('wagerDownBtn'),
+      wagerUpBtn: document.getElementById('wagerUpBtn'),
       spinBtn: document.getElementById('spinBtn')
     };
 
@@ -1062,7 +1115,6 @@
         localStorage.setItem('purchasedItems', JSON.stringify(purchasedItems));
 
         showToast(`You purchased the ${item.name}!`);
-        updateSellBackOptions();
         updateShopButtons();
         render();
       } else {
@@ -1150,59 +1202,19 @@
 
     els.spinBtn.addEventListener('click', spinWheel);
 
-    function updateSellBackOptions() {
-      const sellBackSelect = document.getElementById('sellBackSelect');
-      sellBackSelect.innerHTML = '';
+    els.wagerInput.value = 10;
 
-      const sellableItems = purchasedItems.filter(itemId => shopItems[itemId].type !== 'rank');
-
-      if (sellableItems.length === 0) {
-        sellBackSelect.innerHTML = '<option>No items to sell</option>';
-        document.getElementById('sellBackBtn').disabled = true;
-        return;
+    els.wagerDownBtn.addEventListener('click', () => {
+      let currentWager = parseInt(els.wagerInput.value);
+      if (currentWager > 10) {
+        els.wagerInput.value = currentWager - 10;
       }
-
-      sellableItems.forEach(itemId => {
-        const item = shopItems[itemId];
-        const option = document.createElement('option');
-        option.value = itemId;
-        option.textContent = `${item.name} (Sell for ${item.price / 2} tokens)`;
-        sellBackSelect.appendChild(option);
-      });
-
-      document.getElementById('sellBackBtn').disabled = false;
-    }
-
-    document.getElementById('sellBackBtn').addEventListener('click', () => {
-      const sellBackSelect = document.getElementById('sellBackSelect');
-      const itemId = sellBackSelect.value;
-
-      if (!itemId || !purchasedItems.includes(itemId)) {
-        showToast('Invalid item selected.');
-        return;
-      }
-
-      const item = shopItems[itemId];
-      const sellPrice = item.price / 2;
-
-      tokens += sellPrice;
-      localStorage.setItem('tokens', tokens.toString());
-
-      purchasedItems = purchasedItems.filter(id => id !== itemId);
-      localStorage.setItem('purchasedItems', JSON.stringify(purchasedItems));
-
-      if (item.type === 'background' && background === item.value) {
-        background = 'default';
-        localStorage.setItem('background', background);
-      }
-
-      showToast(`You sold ${item.name} for ${sellPrice} tokens.`);
-      updateShopButtons();
-      updateSellBackOptions();
-      render();
     });
 
-    function updateSellBackOptions() {
+    els.wagerUpBtn.addEventListener('click', () => {
+      let currentWager = parseInt(els.wagerInput.value);
+      els.wagerInput.value = currentWager + 10;
+    });
 
     // Game Actions
     document.getElementById('buyAll').addEventListener('click', () => {
@@ -1473,7 +1485,6 @@
       document.getElementById('shopModal').classList.add('active');
       updateShopButtons();
       updateFreebieButton();
-      updateSellBackOptions();
     });
 
     document.getElementById('closeShopBtn').addEventListener('click', () => {
@@ -1567,8 +1578,7 @@
     // Initialize
     render();
     updateShopButtons();
-    updateSellBackOptions();
     console.log('🎮 Game loaded! Username:', username);
   </script>
-</body>
-</html>
+
+</body></html>
