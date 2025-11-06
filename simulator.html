@@ -1,12 +1,10 @@
+
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trade Simulator</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -492,52 +490,16 @@
       box-shadow: 0 2px 8px rgba(52, 152, 219, 0.4);
     }
 
-    .rank-prefix.pro {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-    }
-
-    .rank-prefix.vip {
-      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-      color: white;
-      box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
-    }
-
     .rank-prefix.member {
-      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-      color: white;
-      box-shadow: 0 2px 8px rgba(52, 152, 219, 0.4);
-    }
-
-    .rank-prefix.pro {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-    }
-
-    .rank-prefix.elite {
-      background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
-      color: #000;
-      box-shadow: 0 2px 8px rgba(241, 196, 15, 0.4);
-    }
-
-    .rank-prefix.master {
-      background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-      color: white;
-      box-shadow: 0 2px 8px rgba(39, 174, 96, 0.4);
-    }
-
-    .rank-prefix.vip {
-      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-      color: white;
-      box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
-    }
-
-    .rank-prefix.noob {
       background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
       color: white;
       box-shadow: 0 2px 8px rgba(149, 165, 166, 0.4);
+    }
+
+    .rank-prefix.noob {
+      background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(255, 106, 0, 0.4);
     }
 
     .rank-prefix.legend {
@@ -673,6 +635,24 @@
       width: 100px;
       text-align: center;
     }
+
+    .trade-offer-section {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .trade-offer-side {
+      width: 100%;
+    }
+
+    .trade-items {
+      background: #f5f7fa;
+      border-radius: 8px;
+      padding: 10px;
+      min-height: 100px;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -712,7 +692,7 @@
       <canvas id="priceChart"></canvas>
     </div>
 
-    <div class="controls">
+    <div class="controllers">
       <button id="buyAll">Buy All</button>
       <button id="buy">Buy 1</button>
       <button id="sell">Sell 1</button>
@@ -761,6 +741,8 @@
     </div>
   </div>
 
+
+
   <div class="modal-overlay" id="shopModal">
     <div class="modal-content">
       <div class="modal-title">🛒 Shop</div>
@@ -774,33 +756,13 @@
         <div class="shop-grid">
           <div class="shop-item">
             <div class="shop-item-name"><span class="rank-prefix noob">NOOB</span></div>
-            <div class="shop-item-price">20 Tokens</div>
+            <div class="shop-item-price">1 Token</div>
             <button class="buy-btn" id="buyNoobRank">Buy</button>
           </div>
           <div class="shop-item">
             <div class="shop-item-name"><span class="rank-prefix member">MEMBER</span></div>
-            <div class="shop-item-price">100 Tokens</div>
+            <div class="shop-item-price">50 Tokens</div>
             <button class="buy-btn" id="buyMemberRank">Buy</button>
-          </div>
-          <div class="shop-item">
-            <div class="shop-item-name"><span class="rank-prefix pro">PRO</span></div>
-            <div class="shop-item-price">300 Tokens</div>
-            <button class="buy-btn" id="buyProRank">Buy</button>
-          </div>
-          <div class="shop-item">
-            <div class="shop-item-name"><span class="rank-prefix elite">ELITE</span></div>
-            <div class="shop-item-price">750 Tokens</div>
-            <button class="buy-btn" id="buyEliteRank">Buy</button>
-          </div>
-          <div class="shop-item">
-            <div class="shop-item-name"><span class="rank-prefix master">MASTER</span></div>
-            <div class="shop-item-price">1000 Tokens</div>
-            <button class="buy-btn" id="buyMasterRank">Buy</button>
-          </div>
-          <div class="shop-item">
-            <div class="shop-item-name"><span class="rank-prefix legend">LEGEND</span></div>
-            <div class="shop-item-price">5000 Tokens</div>
-            <button class="buy-btn" id="buyLegendRank">Buy</button>
           </div>
         </div>
       </div>
@@ -843,6 +805,46 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="sendTokensModal">
+    <div class="modal-content">
+      <div class="modal-title">💸 Send Tokens</div>
+      <div class="form-group">
+        <label class="form-label" for="sendTokensUsernameInput">Send to (Username)</label>
+        <input type="text" id="sendTokensUsernameInput" class="form-input" placeholder="Enter username">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="sendTokensAmountInput">Amount</label>
+        <input type="number" id="sendTokensAmountInput" class="form-input" placeholder="0" min="1">
+      </div>
+      <button class="modal-btn" id="sendTokensConfirmBtn">Send Tokens</button>
+      <button class="modal-btn" id="closeSendTokensBtn" style="background: #cbd5e0; color: #2d3748; margin-left: 10px;">Cancel</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="tradeModal">
+    <div class="modal-content">
+      <div class="modal-title">🤝 Trade</div>
+      <div class="form-group">
+        <label class="form-label" for="tradeUsernameInput">Trade with (Username)</label>
+        <input type="text" id="tradeUsernameInput" class="form-input" placeholder="Enter username">
+      </div>
+
+      <div class="trade-offer-section">
+        <div class="trade-offer-side">
+          <h4>Your Offer</h4>
+          <div class="trade-items" id="yourTradeItems"></div>
+          <div class="form-group">
+            <label class="form-label" for="yourTradeTokens">Tokens</label>
+            <input type="number" id="yourTradeTokens" class="form-input" placeholder="0" min="0">
+          </div>
+        </div>
+      </div>
+
+      <button class="modal-btn" id="sendTradeBtn">Send Trade Offer</button>
+      <button class="modal-btn" id="closeTradeBtn" style="background: #cbd5e0; color: #2d3748; margin-left: 10px;">Cancel</button>
+    </div>
+  </div>
+
   <script>
     // Firebase Configuration
     const firebaseConfig = {
@@ -881,41 +883,14 @@
     let rank = localStorage.getItem('rank') || null;
     let background = localStorage.getItem('background') || 'default';
     let purchasedItems = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
-
-    // Load tokens from Firebase if userDocId exists
-    if (firebaseReady && db && userDocId) {
-      db.collection('leaderboard').doc(userDocId).get().then(doc => {
-        if (doc.exists) {
-          tokens = doc.data().tokens || 0;
-          localStorage.setItem('tokens', tokens.toString());
-          render();
-        }
-      }).catch(error => {
-        console.error('Error loading tokens from Firebase:', error);
-      });
-    }
     
     if (!localStorage.getItem('username')) {
       localStorage.setItem('username', username);
     }
 
-    async function updateTokensInFirebase() {
-      if (firebaseReady && db && userDocId) {
-        try {
-          await db.collection('leaderboard').doc(userDocId).update({ tokens: tokens });
-        } catch (error) {
-          console.error('Error updating tokens in Firebase:', error);
-        }
-      }
-    }
-
     const shopItems = {
-      'buyNoobRank': { name: 'Noob Rank', price: 20, type: 'rank', value: 'noob' },
-      'buyMemberRank': { name: 'Member Rank', price: 100, type: 'rank', value: 'member' },
-      'buyProRank': { name: 'Pro Rank', price: 300, type: 'rank', value: 'pro' },
-      'buyEliteRank': { name: 'Elite Rank', price: 750, type: 'rank', value: 'elite' },
-      'buyMasterRank': { name: 'Master Rank', price: 1000, type: 'rank', value: 'master' },
-      'buyLegendRank': { name: 'Legend Rank', price: 5000, type: 'rank', value: 'legend' },
+      'buyNoobRank': { name: 'Noob Rank', price: 1, type: 'rank', value: 'noob' },
+      'buyMemberRank': { name: 'Member Rank', price: 50, type: 'rank', value: 'member' },
       'buyBuildingsBg': { name: 'Animated Buildings BG', price: 150, type: 'background', value: 'buildings' },
       'buyMatrixBg': { name: 'Matrix Rain BG', price: 200, type: 'background', value: 'matrix' },
     };
@@ -936,11 +911,7 @@
       claimFreebieBtn: document.getElementById('claimFreebieBtn'),
       wheel: document.getElementById('wheel'),
       wagerInput: document.getElementById('wagerInput'),
-      wagerDownBtn: document.getElementById('wagerDownBtn'),
-      wagerUpBtn: document.getElementById('wagerUpBtn'),
-      spinBtn: document.getElementById('spinBtn'),
-      sellBackSelect: document.getElementById('sellBackSelect'),
-      sellBackBtn: document.getElementById('sellBackBtn')
+      spinBtn: document.getElementById('spinBtn')
     };
 
     // Chart Setup
@@ -1078,7 +1049,6 @@
       if (tokens >= item.price) {
         tokens -= item.price;
         localStorage.setItem('tokens', tokens.toString());
-        updateTokensInFirebase();
 
         if (item.type === 'rank') {
           rank = item.value;
@@ -1151,7 +1121,6 @@
 
       isSpinning = true;
       tokens -= wager;
-      updateTokensInFirebase();
       render();
 
       const segmentCount = wheelSegments.length;
@@ -1168,7 +1137,6 @@
         const winnings = Math.floor(wager * selectedSegment.multiplier);
         tokens += winnings;
         localStorage.setItem('tokens', tokens.toString());
-        updateTokensInFirebase();
         showToast(`You won ${winnings} tokens! (x${selectedSegment.multiplier})`);
         render();
         isSpinning = false;
@@ -1181,20 +1149,6 @@
     }
 
     els.spinBtn.addEventListener('click', spinWheel);
-
-    els.wagerInput.value = 10;
-
-    els.wagerDownBtn.addEventListener('click', () => {
-      let currentWager = parseInt(els.wagerInput.value);
-      if (currentWager > 10) {
-        els.wagerInput.value = currentWager - 10;
-      }
-    });
-
-    els.wagerUpBtn.addEventListener('click', () => {
-      let currentWager = parseInt(els.wagerInput.value);
-      els.wagerInput.value = currentWager + 10;
-    });
 
     function updateSellBackOptions() {
       const sellBackSelect = document.getElementById('sellBackSelect');
@@ -1233,7 +1187,6 @@
 
       tokens += sellPrice;
       localStorage.setItem('tokens', tokens.toString());
-      updateTokensInFirebase();
 
       purchasedItems = purchasedItems.filter(id => id !== itemId);
       localStorage.setItem('purchasedItems', JSON.stringify(purchasedItems));
@@ -1248,6 +1201,8 @@
       updateSellBackOptions();
       render();
     });
+
+    function updateSellBackOptions() {
 
     // Game Actions
     document.getElementById('buyAll').addEventListener('click', () => {
@@ -1363,7 +1318,6 @@
           if (score > (data.score || 0)) {
             await doc.ref.update({
               score: score,
-              tokens: tokens,
               timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             console.log('✅ Score updated!');
@@ -1375,7 +1329,6 @@
           const docRef = await db.collection('leaderboard').add({
             username: username,
             score: score,
-            tokens: tokens,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
           });
           userDocId = docRef.id;
@@ -1595,7 +1548,6 @@
       if (lastClaimed !== today) {
         tokens += 10;
         localStorage.setItem('tokens', tokens.toString());
-        updateTokensInFirebase();
         localStorage.setItem('lastClaimed', today);
         showToast('You claimed 10 free tokens!');
         updateFreebieButton();
