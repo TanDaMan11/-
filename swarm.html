@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Swarm</title>
+    <title>Neon Swarm: MEGA SHOP</title>
     <style>
         /* CORE STYLES */
         body { margin: 0; overflow: hidden; background: #050505; color: white; font-family: 'Courier New', Courier, monospace; user-select: none; touch-action: none; }
@@ -174,42 +174,28 @@
 
         // --- PROFANITY FILTER ---
         // Add words here you want to block. MUST BE UPPERCASE HERE.
-        // Example: "BADWORD", "OFFENSIVE"
-        const bannedWords = ["NIGGER", "NIGGA", "RAPE", "FUCK", "SHIT", "BITCH", "JEW", "SHNIG"]; 
+        const bannedWords = ["NIG", "RAPE", "FUCK", "SHIT", "BITCH", "JEW"]; 
 
         // --- CLOUD FUNCTIONS ---
-        // Now uses UserID so changing names updates the SAME score entry
         async function saveScoreToCloud(userId, name, score) {
             if(!db) return;
             try {
-                // Check if USER ID already exists
                 const q = query(collection(db, "leaderboard"), where("uid", "==", userId));
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
                     querySnapshot.forEach(async (docSnap) => {
                         const oldScore = docSnap.data().score;
-                        // Update name regardless, update score if higher
                         if (score > oldScore) {
-                            await updateDoc(doc(db, "leaderboard", docSnap.id), { 
-                                score: score, 
-                                name: name, // Update name in case they changed it
-                                date: Date.now() 
-                            });
+                            await updateDoc(doc(db, "leaderboard", docSnap.id), { score: score, name: name, date: Date.now() });
                             console.log("Updated High Score & Name");
                         } else {
-                            // Even if score isn't higher, update the name so leaderboard is current
                             await updateDoc(doc(db, "leaderboard", docSnap.id), { name: name });
                             console.log("Updated Name Only");
                         }
                     });
                 } else {
-                    await addDoc(collection(db, "leaderboard"), { 
-                        uid: userId, // Save the ID
-                        name: name, 
-                        score: score, 
-                        date: Date.now() 
-                    });
+                    await addDoc(collection(db, "leaderboard"), { uid: userId, name: name, score: score, date: Date.now() });
                     console.log("Created New Score Entry");
                 }
             } catch (e) { console.error("Error saving score: ", e); }
@@ -244,7 +230,6 @@
 
         window.addEventListener('touchstart', e => {
             if (!gameActive || isPaused) return;
-            // Prevent joystick if touching buttons
             if (e.target.tagName === 'BUTTON') return;
             
             let touch = e.touches[0];
@@ -288,31 +273,54 @@
         
         let totalCoins = 0;
         let playerName = "";
-        let playerUid = ""; // Unique ID for this user
+        let playerUid = "";
         let inventory = ['skin_default', 'bg_default', 'proj_orb', 'trail_none', 'ui_default', 'death_default']; 
         let equipped = {
             skin: 'skin_default', bg: 'bg_default', proj: 'proj_orb', trail: 'trail_none', ui: 'ui_default', death: 'death_default'
         };
 
-        let player = { x: 0, y: 0, hp: 100, maxHp: 100, regenTimer: 0, invulnTimer: 0, speed: 5, size: 15, level: 1, xp: 0, nextXp: 50, score: 0, fireRate: 25, bulletDmg: 20, bulletSpeed: 12, bulletCount: 1, pierce: 0, pickupRange: 150, orbitals: 0, meteorLevel: 0, lastMeteor: 0, laserLevel: 0, lastLaser: 0, mineLevel: 0, lastMine: 0 };
+        let player = { x: 0, y: 0, hp: 100, maxHp: 100, regenTimer: 0, invulnTimer: 0, speed: 5, size: 15, level: 1, xp: 0, nextXp: 50, score: 0, fireRate: 25, bulletDmg: 20, bulletSpeed: 12, bulletCount: 1, pierce: 0, pickupRange: 150, orbitals: 0 };
 
-        let bullets = [], enemies = [], particles = [], gems = [], damageText = [], meteors = [], lasers = [], mines = [], trailParticles = [];
+        let bullets = [], enemies = [], particles = [], gems = [], damageText = [], trailParticles = [];
         const keys = {};
         window.addEventListener('keydown', e => { keys[e.key] = true; keys[e.code] = true; });
         window.addEventListener('keyup', e => { keys[e.key] = false; keys[e.code] = false; });
 
+        // --- RESTOCKED SHOP ---
         const cosmetics = [
+            // SKINS
             { id: 'skin_default', type: 'skin', name: 'NEON CYAN', color: '#00ffff', cost: 0 },
             { id: 'skin_red', type: 'skin', name: 'CRIMSON FURY', color: '#ff0000', cost: 20 },
             { id: 'skin_gold', type: 'skin', name: 'MIDAS TOUCH', color: '#ffd700', cost: 50 },
+            { id: 'skin_lime', type: 'skin', name: 'TOXIC LIME', color: '#39ff14', cost: 30 },
+            { id: 'skin_pink', type: 'skin', name: 'HOT PINK', color: '#ff00ff', cost: 30 },
+            { id: 'skin_ghost', type: 'skin', name: 'GHOST WHITE', color: '#ffffff', cost: 40 },
+            
+            // BACKGROUNDS
             { id: 'bg_default', type: 'bg', name: 'DEEP SPACE', bg: '#050505', grid: '#222', cost: 0 },
             { id: 'bg_matrix', type: 'bg', name: 'THE MATRIX', bg: '#001100', grid: '#004400', cost: 30 },
+            { id: 'bg_cyber', type: 'bg', name: 'CYBER GRID', bg: '#0f0014', grid: '#550055', cost: 40 },
+            { id: 'bg_blue', type: 'bg', name: 'BLUEPRINT', bg: '#000514', grid: '#002266', cost: 40 },
+            
+            // PROJECTILES
             { id: 'proj_orb', type: 'proj', name: 'PLASMA ORB', symbol: '', color: '#ffff00', cost: 0 },
             { id: 'proj_star', type: 'proj', name: 'STAR POWER', symbol: '★', color: '#ffaa00', cost: 50 },
+            { id: 'proj_heart', type: 'proj', name: 'LOVE RAY', symbol: '♥', color: '#ff0055', cost: 40 },
+            { id: 'proj_note', type: 'proj', name: 'BASS CANNON', symbol: '♪', color: '#00ffff', cost: 40 },
+            { id: 'proj_shuri', type: 'proj', name: 'NINJA STAR', symbol: '✦', color: '#ffffff', cost: 60 },
+            
+            // TRAILS
             { id: 'trail_none', type: 'trail', name: 'NO TRAIL', color: 'transparent', cost: 0 },
             { id: 'trail_rain', type: 'trail', name: 'RAINBOW', color: 'rainbow', cost: 60 },
+            { id: 'trail_fire', type: 'trail', name: 'AFTERBURNER', color: 'fire', cost: 40 },
+            { id: 'trail_plasma', type: 'trail', name: 'PLASMA LEAK', color: 'plasma', cost: 40 },
+            
+            // UI
             { id: 'ui_default', type: 'ui', name: 'DEFAULT CYAN', hud: '#00ffff', shadow: '#0088ff', cost: 0 },
             { id: 'ui_gold', type: 'ui', name: 'LUXURY GOLD', hud: '#ffd700', shadow: '#aa7700', cost: 60 },
+            { id: 'ui_red', type: 'ui', name: 'DANGER RED', hud: '#ff0000', shadow: '#880000', cost: 40 },
+            
+            // DEATH
             { id: 'death_default', type: 'death', name: 'STANDARD', cost: 0 },
             { id: 'death_conf', type: 'death', name: 'CONFETTI', cost: 50 }
         ];
@@ -325,11 +333,9 @@
                 totalCoins = data.coins || 0;
                 playerName = data.name || "";
                 inventory = data.inventory || inventory;
-                // Load or Create Unique ID
                 playerUid = data.uid || "user_" + Date.now() + "_" + Math.floor(Math.random()*10000);
                 if(data.equipped) equipped = { ...equipped, ...data.equipped };
             } else {
-                // First time user ID
                 playerUid = "user_" + Date.now() + "_" + Math.floor(Math.random()*10000);
             }
             if (!playerName || playerName.trim() === "") {
@@ -346,12 +352,8 @@
         }
         
         function updateName(val) { 
-            // Convert everything to UPPERCASE for the check
             let upper = val.toUpperCase();
-            
-            // PROFANITY CHECK
             let invalid = false;
-            // This checks if the uppercase input matches any uppercase blocked word
             bannedWords.forEach(w => { if(upper.includes(w)) invalid = true; });
 
             const btn = document.getElementById('btn-start');
@@ -363,7 +365,7 @@
             } else {
                 btn.disabled = false;
                 err.style.display = 'none';
-                playerName = upper; // Save as uppercase
+                playerName = upper; 
                 saveData(); 
             }
         }
@@ -490,10 +492,10 @@
                 x: 0, y: 0, hp: 100, maxHp: 100, regenTimer: 0, invulnTimer: 0,
                 speed: 5, size: 15, level: 1, xp: 0, nextXp: 50, score: 0,
                 fireRate: 25, bulletDmg: 20, bulletSpeed: 12, bulletCount: 1, pierce: 0, pickupRange: 150,
-                orbitals: 0, meteorLevel: 0, lastMeteor: 0, laserLevel: 0, lastLaser: 0, mineLevel: 0, lastMine: 0
+                orbitals: 0
             };
             resetUpgrades();
-            bullets = []; enemies = []; particles = []; gems = []; damageText = []; meteors = []; lasers = []; mines = []; trailParticles = [];
+            bullets = []; enemies = []; particles = []; gems = []; damageText = []; trailParticles = [];
             document.getElementById('death-screen').style.display = 'none';
             document.getElementById('upgrade-menu').style.display = 'none';
             updateUI();
@@ -510,12 +512,11 @@
             camera.x = player.x - canvas.width / 2;
             camera.y = player.y - canvas.height / 2;
 
-            // MOVEMENT: JOYSTICK + WASD
+            // MOVEMENT
             let dx = 0, dy = 0;
             if (isTouching) {
-                dx = (touchCurrent.x - touchStart.x) / 40; // Joystick sensitivity
+                dx = (touchCurrent.x - touchStart.x) / 40; 
                 dy = (touchCurrent.y - touchStart.y) / 40;
-                // Clamp speed
                 if (Math.hypot(dx, dy) > 1) {
                     let angle = Math.atan2(dy, dx);
                     dx = Math.cos(angle); dy = Math.sin(angle);
@@ -540,6 +541,8 @@
             if (moving && frame % 5 === 0 && equipped.trail !== 'trail_none') {
                 let tColor = '#fff';
                 if (equipped.trail === 'trail_rain') tColor = `hsl(${frame%360}, 100%, 50%)`;
+                if (equipped.trail === 'trail_fire') tColor = `hsl(${0 + Math.random()*40}, 100%, 50%)`;
+                if (equipped.trail === 'trail_plasma') tColor = `hsl(${180 + Math.random()*40}, 100%, 50%)`;
                 trailParticles.push({ x: player.x, y: player.y, color: tColor, size: 4, life: 1, type: equipped.trail });
             }
 
@@ -550,7 +553,7 @@
             }
             if (player.invulnTimer > 0) player.invulnTimer--;
 
-            // SHOOTING & ABILITIES
+            // SHOOTING
             if (frame % Math.floor(player.fireRate) === 0) shoot();
             
             updateEntities();
@@ -708,9 +711,9 @@
         }
 
         function draw() {
-            let curBg = cosmetics.find(c => c.id === equipped.bg) || cosmetics[3];
+            let curBg = cosmetics.find(c => c.id === equipped.bg) || cosmetics[6];
             let curSkin = cosmetics.find(c => c.id === equipped.skin) || cosmetics[0];
-            let curProj = cosmetics.find(c => c.id === equipped.proj) || cosmetics[5];
+            let curProj = cosmetics.find(c => c.id === equipped.proj) || cosmetics[10];
 
             // BG
             ctx.fillStyle = curBg.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
