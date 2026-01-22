@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Swarm: MEGA SHOP</title>
+    <title>Neon Swarm: RESTORED</title>
     <style>
         /* CORE STYLES */
         body { margin: 0; overflow: hidden; background: #050505; color: white; font-family: 'Courier New', Courier, monospace; user-select: none; touch-action: none; }
@@ -21,39 +21,28 @@
         #hp-bar-fill { background: #ff0055; box-shadow: 0 0 10px #ff0055; width: 100%; }
         .bar-text { position: absolute; top: -25px; left: 0; color: #fff; font-size: 14px; }
 
-        /* ABILITY SLOTS */
-        .ability-dock { display: flex; gap: 15px; margin-left: auto; }
-        .ability-slot { width: 50px; height: 50px; border: 2px solid #333; background: rgba(0,0,0,0.8); position: relative; display: none; align-items: center; justify-content: center; font-size: 20px; color: #555; }
-        .ability-fill { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0, 255, 255, 0.3); height: 0%; transition: height 0.1s linear; }
-        .ability-slot.ready { border-color: #00ffff; color: #00ffff; box-shadow: 0 0 15px #00ffff; }
-
-        /* MENUS & SCREENS */
+        /* MENUS */
         .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(5px); }
         h1 { font-size: 80px; margin: 0; text-shadow: 0 0 20px #00ffff; color: #fff; letter-spacing: 5px; text-align: center; }
         
-        /* NEW BUTTON LAYOUT */
         .menu-row { display: flex; align-items: center; gap: 30px; margin-top: 30px; }
         
         button { background: transparent; border: 2px solid #555; color: #aaa; padding: 15px 30px; font-size: 20px; font-family: inherit; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 2px; }
         button:hover { border-color: #00ffff; color: #00ffff; box-shadow: 0 0 15px rgba(0,255,255,0.3); }
-        button:disabled { border-color: #333; color: #333; box-shadow: none; cursor: not-allowed; opacity: 0.5; }
+        button:disabled { border-color: #333; color: #333; cursor: not-allowed; opacity: 0.5; box-shadow: none; }
         
         .btn-main { border: 2px solid #00ffff; color: #00ffff; font-size: 32px; padding: 20px 60px; font-weight: bold; background: rgba(0, 255, 255, 0.05); }
         .btn-main:hover:not(:disabled) { background: #00ffff; color: #000; box-shadow: 0 0 30px #00ffff; transform: scale(1.05); }
 
         input { background: transparent; border: none; border-bottom: 2px solid #555; color: #fff; font-family: inherit; font-size: 30px; text-align: center; margin: 20px; width: 350px; outline: none; text-transform: uppercase; }
         input:focus { border-color: #00ffff; }
-        
         #name-error { color: #ff0055; font-weight: bold; display: none; margin-top: -10px; margin-bottom: 10px; text-shadow: 0 0 10px red; }
 
         /* SHOP */
         #shop-content { display: flex; flex-direction: column; gap: 10px; width: 70%; max-height: 60vh; overflow-y: auto; background: rgba(0,0,0,0.5); padding: 20px; border: 1px solid #333; }
         .shop-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border: 1px solid #333; }
-        .shop-info { display: flex; align-items: center; gap: 15px; }
-        .shop-preview { width: 40px; height: 40px; border: 2px solid #555; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .buy-btn { font-size: 14px; padding: 5px 15px; margin: 0; min-width: 100px; }
         .buy-btn.equipped { background: #00ff00; border-color: #00ff00; color: #000; pointer-events: none; }
-        .buy-btn:disabled { border-color: #555; color: #555; cursor: not-allowed; }
 
         /* CARDS & LEADERBOARD */
         #upgrade-menu { display: none; }
@@ -67,10 +56,8 @@
         #leaderboard-content { width: 500px; max-height: 60vh; overflow-y: auto; border: 1px solid #333; padding: 20px; background: rgba(0,0,0,0.8); }
         .lb-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; font-size: 18px; color: #aaa; }
         .lb-row.top { color: #ffd700; font-weight: bold; font-size: 22px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
-        
-        #coin-anim { position: absolute; top: 80px; left: 60px; color: #ffd700; font-size: 20px; font-weight: bold; opacity: 0; transition: 0.5s; pointer-events: none; }
 
-        /* JOYSTICK STYLE */
+        /* JOYSTICK */
         #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 150px; height: 150px; border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; pointer-events: none; z-index: 100; }
         #joystick-knob { width: 60px; height: 60px; background: rgba(0, 255, 255, 0.5); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 20px #00ffff; }
     </style>
@@ -87,7 +74,6 @@
             <span id="time-text">00:00</span>
             <span id="level-text">LVL: 1</span>
         </div>
-        <div id="coin-anim">+1 🪙</div>
         <div class="hud-bottom">
             <div class="bar-container">
                 <span class="bar-text" id="hp-text">100 / 100</span>
@@ -95,10 +81,6 @@
             </div>
             <div class="bar-container" style="width: 100%; height: 10px; border-color: #444;">
                 <div class="bar-fill" id="xp-bar-fill"></div>
-            </div>
-            <div class="ability-dock">
-                <div class="ability-slot" id="slot-laser">L<div class="ability-fill" id="fill-laser"></div></div>
-                <div class="ability-slot" id="slot-mine">M<div class="ability-fill" id="fill-mine"></div></div>
             </div>
         </div>
     </div>
@@ -108,13 +90,11 @@
         <p style="color: #888; letter-spacing: 2px; margin-bottom: 20px;">WASD / TOUCH to Move</p>
         
         <input type="text" id="player-name" placeholder="ENTER NAME" maxlength="15" oninput="updateName(this.value)">
-        <div id="name-error">INVALID NAME: CONTAINS BANNED WORDS</div>
+        <div id="name-error">INVALID NAME</div>
         
         <div class="menu-row">
             <button onclick="showLeaderboard()">RANKINGS</button>
-            
             <button class="btn-main" id="btn-start" onclick="startGame()">START</button>
-            
             <button onclick="openShop()">SHOP (<span id="coin-count">0</span> 🪙)</button>
         </div>
     </div>
@@ -148,11 +128,10 @@
     </div>
 
     <script type="module">
-        // --- FIREBASE SETUP ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, where, updateDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-        // YOUR CONFIG
+        // FIREBASE CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyD6rmIdWG1pm695Q_0Zcapbwcx8JlvgpHY",
             authDomain: "neon-swarm.firebaseapp.com",
@@ -167,38 +146,27 @@
         try {
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
-            console.log("Firebase Connected Successfully");
-        } catch(e) {
-            console.error("Firebase connection failed:", e);
-        }
+            console.log("Firebase Connected");
+        } catch(e) { console.error("Firebase error:", e); }
 
-        // --- PROFANITY FILTER ---
-        // Add words here you want to block. MUST BE UPPERCASE HERE.
-        const bannedWords = ["NIG", "RAPE", "FUCK", "SHIT", "BITCH", "JEW"]; 
-
-        // --- CLOUD FUNCTIONS ---
+        // CLOUD FUNCTIONS
         async function saveScoreToCloud(userId, name, score) {
             if(!db) return;
             try {
                 const q = query(collection(db, "leaderboard"), where("uid", "==", userId));
                 const querySnapshot = await getDocs(q);
-
                 if (!querySnapshot.empty) {
                     querySnapshot.forEach(async (docSnap) => {
-                        const oldScore = docSnap.data().score;
-                        if (score > oldScore) {
+                        if (score > docSnap.data().score) {
                             await updateDoc(doc(db, "leaderboard", docSnap.id), { score: score, name: name, date: Date.now() });
-                            console.log("Updated High Score & Name");
                         } else {
                             await updateDoc(doc(db, "leaderboard", docSnap.id), { name: name });
-                            console.log("Updated Name Only");
                         }
                     });
                 } else {
                     await addDoc(collection(db, "leaderboard"), { uid: userId, name: name, score: score, date: Date.now() });
-                    console.log("Created New Score Entry");
                 }
-            } catch (e) { console.error("Error saving score: ", e); }
+            } catch (e) {}
         }
 
         async function getLeaderboardFromCloud() {
@@ -212,7 +180,10 @@
             } catch (e) { return []; }
         }
 
-        // --- GAME ENGINE ---
+        // PROFANITY FILTER
+        const bannedWords = ["BADWORD", "SLUR", "IDIOT", "STUPID", "DAMN", "HELL", "BITCH"];
+
+        // GAME ENGINE
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const root = document.documentElement;
@@ -221,7 +192,7 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // --- JOYSTICK LOGIC ---
+        // JOYSTICK
         let touchStart = { x: 0, y: 0 };
         let touchCurrent = { x: 0, y: 0 };
         let isTouching = false;
@@ -231,12 +202,10 @@
         window.addEventListener('touchstart', e => {
             if (!gameActive || isPaused) return;
             if (e.target.tagName === 'BUTTON') return;
-            
             let touch = e.touches[0];
             touchStart = { x: touch.clientX, y: touch.clientY };
             touchCurrent = { x: touch.clientX, y: touch.clientY };
             isTouching = true;
-            
             joyZone.style.display = 'block';
             joyZone.style.left = (touchStart.x - 75) + 'px';
             joyZone.style.top = (touchStart.y - 75) + 'px';
@@ -248,7 +217,6 @@
             e.preventDefault(); 
             let touch = e.touches[0];
             touchCurrent = { x: touch.clientX, y: touch.clientY };
-
             let dx = touchCurrent.x - touchStart.x;
             let dy = touchCurrent.y - touchStart.y;
             let dist = Math.hypot(dx, dy);
@@ -257,12 +225,9 @@
             joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         });
 
-        window.addEventListener('touchend', () => {
-            isTouching = false;
-            joyZone.style.display = 'none';
-        });
+        window.addEventListener('touchend', () => { isTouching = false; joyZone.style.display = 'none'; });
 
-        // --- GAME DATA ---
+        // VARIABLES
         let gameActive = false;
         let isPaused = false;
         let isDying = false; 
@@ -279,14 +244,15 @@
             skin: 'skin_default', bg: 'bg_default', proj: 'proj_orb', trail: 'trail_none', ui: 'ui_default', death: 'death_default'
         };
 
-        let player = { x: 0, y: 0, hp: 100, maxHp: 100, regenTimer: 0, invulnTimer: 0, speed: 5, size: 15, level: 1, xp: 0, nextXp: 50, score: 0, fireRate: 25, bulletDmg: 20, bulletSpeed: 12, bulletCount: 1, pierce: 0, pickupRange: 150, orbitals: 0 };
+        let player = { x: 0, y: 0, hp: 100, maxHp: 100, regenTimer: 0, invulnTimer: 0, speed: 5, size: 15, level: 1, xp: 0, nextXp: 50, score: 0, fireRate: 25, bulletDmg: 20, bulletSpeed: 12, bulletCount: 1, pierce: 0, pickupRange: 150, orbitals: 0, hasLaser: false, hasMine: false };
 
-        let bullets = [], enemies = [], particles = [], gems = [], damageText = [], trailParticles = [];
+        let bullets = [], enemies = [], particles = [], gems = [], damageText = [], trailParticles = [], mines = [];
+        let laserBeam = null; // {x, y, tx, ty, life}
         const keys = {};
         window.addEventListener('keydown', e => { keys[e.key] = true; keys[e.code] = true; });
         window.addEventListener('keyup', e => { keys[e.key] = false; keys[e.code] = false; });
 
-        // --- RESTOCKED SHOP ---
+        // SHOP COSMETICS (The "Mega Shop" List)
         const cosmetics = [
             // SKINS
             { id: 'skin_default', type: 'skin', name: 'NEON CYAN', color: '#00ffff', cost: 0 },
@@ -295,39 +261,30 @@
             { id: 'skin_lime', type: 'skin', name: 'TOXIC LIME', color: '#39ff14', cost: 30 },
             { id: 'skin_pink', type: 'skin', name: 'HOT PINK', color: '#ff00ff', cost: 30 },
             { id: 'skin_ghost', type: 'skin', name: 'GHOST WHITE', color: '#ffffff', cost: 40 },
-            
             // BACKGROUNDS
             { id: 'bg_default', type: 'bg', name: 'DEEP SPACE', bg: '#050505', grid: '#222', cost: 0 },
             { id: 'bg_matrix', type: 'bg', name: 'THE MATRIX', bg: '#001100', grid: '#004400', cost: 30 },
             { id: 'bg_cyber', type: 'bg', name: 'CYBER GRID', bg: '#0f0014', grid: '#550055', cost: 40 },
             { id: 'bg_blue', type: 'bg', name: 'BLUEPRINT', bg: '#000514', grid: '#002266', cost: 40 },
-            
             // PROJECTILES
             { id: 'proj_orb', type: 'proj', name: 'PLASMA ORB', symbol: '', color: '#ffff00', cost: 0 },
             { id: 'proj_star', type: 'proj', name: 'STAR POWER', symbol: '★', color: '#ffaa00', cost: 50 },
             { id: 'proj_heart', type: 'proj', name: 'LOVE RAY', symbol: '♥', color: '#ff0055', cost: 40 },
             { id: 'proj_note', type: 'proj', name: 'BASS CANNON', symbol: '♪', color: '#00ffff', cost: 40 },
-            { id: 'proj_shuri', type: 'proj', name: 'NINJA STAR', symbol: '✦', color: '#ffffff', cost: 60 },
-            
             // TRAILS
             { id: 'trail_none', type: 'trail', name: 'NO TRAIL', color: 'transparent', cost: 0 },
             { id: 'trail_rain', type: 'trail', name: 'RAINBOW', color: 'rainbow', cost: 60 },
             { id: 'trail_fire', type: 'trail', name: 'AFTERBURNER', color: 'fire', cost: 40 },
             { id: 'trail_plasma', type: 'trail', name: 'PLASMA LEAK', color: 'plasma', cost: 40 },
-            
             // UI
             { id: 'ui_default', type: 'ui', name: 'DEFAULT CYAN', hud: '#00ffff', shadow: '#0088ff', cost: 0 },
             { id: 'ui_gold', type: 'ui', name: 'LUXURY GOLD', hud: '#ffd700', shadow: '#aa7700', cost: 60 },
-            { id: 'ui_red', type: 'ui', name: 'DANGER RED', hud: '#ff0000', shadow: '#880000', cost: 40 },
-            
-            // DEATH
-            { id: 'death_default', type: 'death', name: 'STANDARD', cost: 0 },
-            { id: 'death_conf', type: 'death', name: 'CONFETTI', cost: 50 }
+            { id: 'ui_red', type: 'ui', name: 'DANGER RED', hud: '#ff0000', shadow: '#880000', cost: 40 }
         ];
 
-        // --- SAVE / LOAD SYSTEM ---
+        // SAVE SYSTEM
         function loadData() {
-            let saved = localStorage.getItem('neon_swarm_data_v3');
+            let saved = localStorage.getItem('neon_swarm_data_v4');
             if (saved) {
                 let data = JSON.parse(saved);
                 totalCoins = data.coins || 0;
@@ -338,9 +295,7 @@
             } else {
                 playerUid = "user_" + Date.now() + "_" + Math.floor(Math.random()*10000);
             }
-            if (!playerName || playerName.trim() === "") {
-                playerName = "GUEST" + Math.floor(1000 + Math.random() * 9000);
-            }
+            if (!playerName || playerName.trim() === "") playerName = "GUEST" + Math.floor(1000 + Math.random() * 9000);
             applyTheme();
             document.getElementById('coin-count').innerText = totalCoins;
             document.getElementById('player-name').value = playerName;
@@ -348,26 +303,17 @@
 
         function saveData() {
             let data = { coins: totalCoins, name: playerName, inventory: inventory, equipped: equipped, uid: playerUid };
-            localStorage.setItem('neon_swarm_data_v3', JSON.stringify(data));
+            localStorage.setItem('neon_swarm_data_v4', JSON.stringify(data));
         }
         
         function updateName(val) { 
             let upper = val.toUpperCase();
             let invalid = false;
             bannedWords.forEach(w => { if(upper.includes(w)) invalid = true; });
-
             const btn = document.getElementById('btn-start');
             const err = document.getElementById('name-error');
-
-            if(invalid) {
-                btn.disabled = true;
-                err.style.display = 'block';
-            } else {
-                btn.disabled = false;
-                err.style.display = 'none';
-                playerName = upper; 
-                saveData(); 
-            }
+            if(invalid) { btn.disabled = true; err.style.display = 'block'; }
+            else { btn.disabled = false; err.style.display = 'none'; playerName = upper; saveData(); }
         }
         
         function applyTheme() {
@@ -379,94 +325,66 @@
 
         loadData();
 
-        // --- SHOP LOGIC ---
+        // SHOP LOGIC
         function openShop() {
             document.getElementById('start-screen').style.display = 'none';
-            document.getElementById('death-screen').style.display = 'none';
             document.getElementById('shop-screen').style.display = 'flex';
             renderShop();
         }
-
         function closeShop() {
             document.getElementById('shop-screen').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
         }
-
         function renderShop() {
             document.getElementById('shop-coins').innerText = totalCoins;
             let content = document.getElementById('shop-content');
             content.innerHTML = '';
-            
             let categories = [
-                { id: 'skin', name: 'SHIP SKINS' },
-                { id: 'bg', name: 'BACKGROUNDS' },
-                { id: 'proj', name: 'PROJECTILES' },
-                { id: 'trail', name: 'ENGINE TRAILS' },
-                { id: 'ui', name: 'HUD THEMES' },
-                { id: 'death', name: 'DEATH FX' }
+                { id: 'skin', name: 'SHIP SKINS' }, { id: 'bg', name: 'BACKGROUNDS' },
+                { id: 'proj', name: 'PROJECTILES' }, { id: 'trail', name: 'TRAILS' }, { id: 'ui', name: 'HUD THEMES' }
             ];
-
             categories.forEach(cat => {
                 let title = document.createElement('div'); 
                 title.style.color = '#888'; title.style.marginTop='15px'; title.innerText = cat.name; 
                 content.appendChild(title);
-                
                 cosmetics.filter(c => c.type === cat.id).forEach(item => {
-                    let row = document.createElement('div');
-                    row.className = 'shop-row';
+                    let row = document.createElement('div'); row.className = 'shop-row';
                     let owned = inventory.includes(item.id);
                     let isEquipped = equipped[cat.id] === item.id;
                     let btnText = isEquipped ? "EQUIPPED" : (owned ? "EQUIP" : "BUY " + item.cost + "🪙");
                     let btnClass = isEquipped ? "buy-btn equipped" : (owned ? "buy-btn" : (totalCoins >= item.cost ? "buy-btn can-buy" : "buy-btn"));
-                    
-                    row.innerHTML = `
-                        <div class="shop-info">
-                            <div><h3 style="margin:0; font-size:16px; color:#fff">${item.name}</h3></div>
-                        </div>
-                        <button class="${btnClass}" ${(!owned && totalCoins < item.cost) ? 'disabled' : ''}>${btnText}</button>
-                    `;
+                    row.innerHTML = `<div class="shop-info"><h3>${item.name}</h3></div><button class="${btnClass}" ${(!owned && totalCoins < item.cost) ? 'disabled' : ''}>${btnText}</button>`;
                     row.querySelector('button').onclick = () => handleShopClick(item, cat.id);
                     content.appendChild(row);
                 });
             });
         }
-
         function handleShopClick(item, type) {
-            if (inventory.includes(item.id)) {
-                equipped[type] = item.id;
-            } else {
-                if (totalCoins >= item.cost) {
-                    totalCoins -= item.cost; inventory.push(item.id);
-                    equipped[type] = item.id;
-                }
-            }
+            if (inventory.includes(item.id)) { equipped[type] = item.id; } 
+            else if (totalCoins >= item.cost) { totalCoins -= item.cost; inventory.push(item.id); equipped[type] = item.id; }
             if(type === 'ui') applyTheme();
             saveData(); renderShop(); document.getElementById('coin-count').innerText = totalCoins;
         }
 
-        // --- LEADERBOARD & ENGINE SETUP ---
+        // LEADERBOARD
         async function showLeaderboard() {
             document.getElementById('start-screen').style.display = 'none';
-            document.getElementById('death-screen').style.display = 'none';
             document.getElementById('leaderboard-screen').style.display = 'flex';
             let content = document.getElementById('leaderboard-content');
             content.innerHTML = "LOADING DATA...";
-            
             let data = await getLeaderboardFromCloud();
-            
             content.innerHTML = "";
-            if (data.length === 0) { content.innerHTML = "<p style='color:#666; margin-top:50px;'>NO CLOUD DATA OR OFFLINE.</p>"; return; }
-            
+            if (data.length === 0) { content.innerHTML = "<p>NO DATA</p>"; return; }
             data.forEach((entry, i) => {
                 content.innerHTML += `<div class="lb-row ${i===0?'top':''}"><span>#${i+1} ${entry.name}</span><span>${entry.score}</span></div>`;
             });
         }
-        
         function hideLeaderboard() {
             document.getElementById('leaderboard-screen').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
         }
 
+        // UPGRADES - RESTORED LASER AND MINE
         let upgradePool = [];
         function resetUpgrades() {
             upgradePool = [
@@ -474,9 +392,11 @@
                 { id: "multi", name: "MULTISHOT", desc: "+1 Projectile", type: "stat", key: "bulletCount", val: 1, max: 6, count: 0 },
                 { id: "dmg", name: "HIGH CALIBER", desc: "Damage +30%", type: "stat", key: "bulletDmg", val: 1.3, max: 10, count: 0 },
                 { id: "speed", name: "THRUSTERS", desc: "Move Speed +10%", type: "stat", key: "speed", val: 1.10, max: 5, count: 0 },
-                { id: "mag", name: "MAGNET FIELD", desc: "Pickup Range +40%", type: "stat", key: "pickupRange", val: 1.4, max: 5, count: 0 },
                 { id: "orb", name: "PLASMA ORBITAL", desc: "Add spinning shield", type: "ability", key: "orbital", max: 5, count: 0 },
-                { id: "hull", name: "TITANIUM HULL", desc: "+50 Max HP & Heal", type: "heal", max: 99, count: 0 }
+                { id: "hull", name: "TITANIUM HULL", desc: "+50 Max HP & Heal", type: "heal", max: 99, count: 0 },
+                // RESTORED ABILITIES
+                { id: "laser", name: "ORBITAL LASER", desc: "Auto-fires piercing beam", type: "unlock", key: "hasLaser", max: 1, count: 0 },
+                { id: "mine", name: "PROXIMITY MINE", desc: "Drops explosive mines", type: "unlock", key: "hasMine", max: 1, count: 0 }
             ];
         }
 
@@ -492,10 +412,10 @@
                 x: 0, y: 0, hp: 100, maxHp: 100, regenTimer: 0, invulnTimer: 0,
                 speed: 5, size: 15, level: 1, xp: 0, nextXp: 50, score: 0,
                 fireRate: 25, bulletDmg: 20, bulletSpeed: 12, bulletCount: 1, pierce: 0, pickupRange: 150,
-                orbitals: 0
+                orbitals: 0, hasLaser: false, hasMine: false
             };
             resetUpgrades();
-            bullets = []; enemies = []; particles = []; gems = []; damageText = []; trailParticles = [];
+            bullets = []; enemies = []; particles = []; gems = []; damageText = []; trailParticles = []; mines = [];
             document.getElementById('death-screen').style.display = 'none';
             document.getElementById('upgrade-menu').style.display = 'none';
             updateUI();
@@ -512,97 +432,114 @@
             camera.x = player.x - canvas.width / 2;
             camera.y = player.y - canvas.height / 2;
 
-            // MOVEMENT
+            // MOVE
             let dx = 0, dy = 0;
             if (isTouching) {
                 dx = (touchCurrent.x - touchStart.x) / 40; 
                 dy = (touchCurrent.y - touchStart.y) / 40;
-                if (Math.hypot(dx, dy) > 1) {
-                    let angle = Math.atan2(dy, dx);
-                    dx = Math.cos(angle); dy = Math.sin(angle);
-                }
+                if (Math.hypot(dx, dy) > 1) { let a = Math.atan2(dy, dx); dx = Math.cos(a); dy = Math.sin(a); }
             } else {
                 if (keys['KeyW'] || keys['ArrowUp']) dy = -1;
                 if (keys['KeyS'] || keys['ArrowDown']) dy = 1;
                 if (keys['KeyA'] || keys['ArrowLeft']) dx = -1;
                 if (keys['KeyD'] || keys['ArrowRight']) dx = 1;
             }
-            
-            let moving = (dx !== 0 || dy !== 0);
-            if (moving) {
+            if (dx!==0 || dy!==0) {
                 let len = Math.hypot(dx, dy);
-                if (len > 0.1) {
-                     player.x += (dx/len) * player.speed;
-                     player.y += (dy/len) * player.speed;
+                player.x += (dx/len) * player.speed; player.y += (dy/len) * player.speed;
+                // Trail
+                if (frame % 5 === 0 && equipped.trail !== 'trail_none') {
+                    let c = '#fff';
+                    if(equipped.trail === 'trail_rain') c = `hsl(${frame%360},100%,50%)`;
+                    if(equipped.trail === 'trail_fire') c = 'orange';
+                    if(equipped.trail === 'trail_plasma') c = 'cyan';
+                    trailParticles.push({ x: player.x, y: player.y, color: c, size: 4, life: 1 });
                 }
-            }
-
-            // TRAIL
-            if (moving && frame % 5 === 0 && equipped.trail !== 'trail_none') {
-                let tColor = '#fff';
-                if (equipped.trail === 'trail_rain') tColor = `hsl(${frame%360}, 100%, 50%)`;
-                if (equipped.trail === 'trail_fire') tColor = `hsl(${0 + Math.random()*40}, 100%, 50%)`;
-                if (equipped.trail === 'trail_plasma') tColor = `hsl(${180 + Math.random()*40}, 100%, 50%)`;
-                trailParticles.push({ x: player.x, y: player.y, color: tColor, size: 4, life: 1, type: equipped.trail });
             }
 
             // REGEN
             player.regenTimer++;
-            if (player.regenTimer >= 60 && player.hp < player.maxHp) {
-                player.hp = Math.min(player.maxHp, player.hp + 1); player.regenTimer = 0; updateUI();
-            }
+            if (player.regenTimer >= 60 && player.hp < player.maxHp) { player.hp = Math.min(player.maxHp, player.hp + 1); player.regenTimer = 0; updateUI(); }
             if (player.invulnTimer > 0) player.invulnTimer--;
 
-            // SHOOTING
+            // ABILITIES
             if (frame % Math.floor(player.fireRate) === 0) shoot();
             
+            // LASER LOGIC
+            if (player.hasLaser && frame % 90 === 0 && enemies.length > 0) {
+                let nearest = enemies.reduce((a, b) => Math.hypot(player.x-a.x, player.y-a.y) < Math.hypot(player.x-b.x, player.y-b.y) ? a : b);
+                if (Math.hypot(player.x - nearest.x, player.y - nearest.y) < 500) {
+                    laserBeam = { x: player.x, y: player.y, tx: nearest.x, ty: nearest.y, life: 10 };
+                    damageEnemy(nearest, player.bulletDmg * 2);
+                }
+            }
+
+            // MINE LOGIC
+            if (player.hasMine && frame % 120 === 0) {
+                mines.push({ x: player.x, y: player.y, size: 10, active: false, timer: 60 });
+            }
+
             updateEntities();
-            
-            let seconds = Math.floor(frame / 60);
-            document.getElementById('time-text').innerText = Math.floor(seconds/60) + ":" + (seconds%60 < 10 ? "0" : "") + (seconds%60);
+            let sec = Math.floor(frame / 60);
+            document.getElementById('time-text').innerText = Math.floor(sec/60) + ":" + (sec%60 < 10 ? "0" : "") + (sec%60);
             updateUI(); 
         }
 
         function updateEntities() {
             // TRAIL
             for(let i=trailParticles.length-1; i>=0; i--) {
-                let p = trailParticles[i]; p.life -= 0.02; 
-                if(p.life <= 0) trailParticles.splice(i, 1);
+                let p = trailParticles[i]; p.life -= 0.02; if(p.life <= 0) trailParticles.splice(i, 1);
+            }
+            // MINES
+            for(let i=mines.length-1; i>=0; i--) {
+                let m = mines[i];
+                if (m.timer > 0) m.timer--; else m.active = true;
+                if (m.active) {
+                    for(let e of enemies) {
+                        if (Math.hypot(m.x - e.x, m.y - e.y) < m.size + e.size) {
+                            damageEnemy(e, player.bulletDmg * 5);
+                            particles.push({x: m.x, y: m.y, vx:0, vy:0, life:1, color:'orange'});
+                            mines.splice(i, 1); break;
+                        }
+                    }
+                }
             }
 
             // BULLETS
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let b = bullets[i];
-                b.x += Math.cos(b.angle) * player.bulletSpeed;
-                b.y += Math.sin(b.angle) * player.bulletSpeed;
-                b.life--;
+                b.x += Math.cos(b.angle) * player.bulletSpeed; b.y += Math.sin(b.angle) * player.bulletSpeed; b.life--;
                 let hit = false;
                 for (let e of enemies) {
                     if (Math.hypot(b.x - e.x, b.y - e.y) < e.size + b.size) {
-                        damageEnemy(e, player.bulletDmg);
-                        b.hits++; if (b.hits > player.pierce) hit = true; break; 
+                        damageEnemy(e, player.bulletDmg); b.hits++; if (b.hits > player.pierce) hit = true; break; 
                     }
                 }
                 if (hit || b.life <= 0) bullets.splice(i, 1);
             }
 
-            // ENEMIES
+            // ENEMY SPAWNING (RESTORED LOGIC)
             let spawnRate = Math.max(1, 40 - (player.level*1.5 + (frame/600))); 
-            if (frame % Math.floor(spawnRate) === 0) spawnEnemy();
+            if (frame % Math.floor(spawnRate) === 0) {
+                let type = 'grunt';
+                // Orange Dasher logic (after 30s)
+                if (frame > 1800 && Math.random() < 0.2) type = 'dasher';
+                // Boss logic (after 60s)
+                if (frame > 3600 && Math.random() < 0.05) type = 'boss';
+                spawnEnemy(type);
+            }
 
+            // ENEMY UPDATE
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let e = enemies[i];
                 let angle = Math.atan2(player.y - e.y, player.x - e.x);
-                e.x += Math.cos(angle) * e.speed;
-                e.y += Math.sin(angle) * e.speed;
+                e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed;
 
                 if (player.orbitals > 0) {
-                    let dist = Math.hypot(player.x - e.x, player.y - e.y);
-                    if (dist < 100 && frame % 10 === 0) { damageEnemy(e, player.bulletDmg * 0.8); }
+                    if (Math.hypot(player.x - e.x, player.y - e.y) < 100 && frame % 10 === 0) damageEnemy(e, player.bulletDmg * 0.8);
                 }
-                let dist = Math.hypot(player.x - e.x, player.y - e.y);
-                if (dist < player.size + e.size) { takeDamage(10); }
-                if (dist > 2500) enemies.splice(i, 1);
+                if (Math.hypot(player.x - e.x, player.y - e.y) < player.size + e.size) takeDamage(10);
+                if (Math.hypot(player.x - e.x, player.y - e.y) > 2500) enemies.splice(i, 1);
             }
 
             // GEMS
@@ -612,8 +549,7 @@
                 if (dist < player.pickupRange) g.mag = true;
                 if (g.mag) {
                     let angle = Math.atan2(player.y - g.y, player.x - g.x);
-                    g.x += Math.cos(angle) * (player.speed + 8);
-                    g.y += Math.sin(angle) * (player.speed + 8);
+                    g.x += Math.cos(angle) * (player.speed + 8); g.y += Math.sin(angle) * (player.speed + 8);
                     if (dist < player.size + 10) { gainXp(g.val); gems.splice(i, 1); }
                 }
             }
@@ -621,12 +557,20 @@
             damageText.forEach((d, i) => { d.y -= 1; d.life -= 0.02; if(d.life <= 0) damageText.splice(i,1); });
         }
 
-        function spawnEnemy() {
+        function spawnEnemy(type) {
             let angle = Math.random() * Math.PI * 2;
             let dist = (Math.max(canvas.width, canvas.height) / 2) + 100;
             let x = player.x + Math.cos(angle) * dist;
             let y = player.y + Math.sin(angle) * dist;
-            enemies.push({ x, y, type: 'grunt', size: 20, hp: 20 * globalDifficulty, speed: 2 + (globalDifficulty*0.2), color: '#ff0055' });
+            
+            // ENEMY STATS RESTORED
+            if (type === 'grunt') {
+                enemies.push({ x, y, size: 20, hp: 20 * globalDifficulty, speed: 2 + (globalDifficulty*0.2), color: '#ff0055' });
+            } else if (type === 'dasher') {
+                enemies.push({ x, y, size: 15, hp: 15 * globalDifficulty, speed: 6 + (globalDifficulty*0.2), color: '#ffaa00' });
+            } else if (type === 'boss') {
+                enemies.push({ x, y, size: 60, hp: 500 * globalDifficulty, speed: 1.5, color: '#aa0000' });
+            }
         }
 
         function damageEnemy(e, amt) {
@@ -635,9 +579,7 @@
             if (e.hp <= 0 && enemies.includes(e)) {
                 enemies.splice(enemies.indexOf(e), 1);
                 player.score++;
-                if (player.score % 10 === 0) {
-                    totalCoins++; saveData(); document.getElementById('coin-count').innerText = totalCoins;
-                }
+                if (player.score % 10 === 0) { totalCoins++; saveData(); document.getElementById('coin-count').innerText = totalCoins; }
                 gems.push({ x: e.x, y: e.y, val: 5 + Math.floor(globalDifficulty), mag: false });
                 updateUI();
             }
@@ -689,6 +631,7 @@
                     u.count++;
                     if (u.type === 'stat') { if (u.key === 'fireRate') player.fireRate *= u.val; else if (u.key === 'bulletCount') player.bulletCount += u.val; else player[u.key] *= u.val; }
                     else if (u.type === 'heal') { player.maxHp += 50; player.hp = Math.min(player.maxHp, player.maxHp + 50); }
+                    else if (u.type === 'unlock') { player[u.key] = true; }
                     else { if (u.key === 'orbital') player.orbitals++; }
                     menu.style.display = 'none'; isPaused = false; updateUI();
                 };
@@ -726,6 +669,7 @@
             function drawAt(x, y, fn) { let sx = x - camera.x, sy = y - camera.y; if (sx<-50||sx>canvas.width+50||sy<-50||sy>canvas.height+50) return; ctx.save(); ctx.translate(sx, sy); fn(); ctx.restore(); }
             
             trailParticles.forEach(p => drawAt(p.x, p.y, () => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill(); }));
+            mines.forEach(m => drawAt(m.x, m.y, () => { ctx.fillStyle = m.active ? 'red' : 'gray'; ctx.beginPath(); ctx.arc(0,0, m.size, 0, Math.PI*2); ctx.fill(); }));
             gems.forEach(g => drawAt(g.x, g.y, () => { ctx.fillStyle = '#00ff00'; ctx.beginPath(); ctx.arc(0,0, 5, 0, Math.PI*2); ctx.fill(); }));
             
             enemies.forEach(e => drawAt(e.x, e.y, () => {
@@ -743,16 +687,20 @@
                 }
                 ctx.fillStyle = (player.invulnTimer > 0 && Math.floor(Date.now()/50)%2===0) ? 'red' : curSkin.color; 
                 ctx.fillRect(-10, -10, 20, 20);
+                
+                // Draw Laser Beam
+                if (laserBeam && laserBeam.life > 0) {
+                    ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 4; ctx.beginPath();
+                    ctx.moveTo(0,0); ctx.lineTo(laserBeam.tx - player.x, laserBeam.ty - player.y);
+                    ctx.stroke(); laserBeam.life--;
+                }
                 ctx.restore();
             }
 
             bullets.forEach(b => drawAt(b.x, b.y, () => { 
                 ctx.fillStyle = curProj.color; 
-                if (curProj.symbol) {
-                    ctx.font = '20px Arial'; ctx.textAlign = 'center'; ctx.textBaseline='middle'; ctx.fillText(curProj.symbol, 0, 0);
-                } else {
-                    ctx.beginPath(); ctx.arc(0,0, 4, 0, Math.PI*2); ctx.fill(); 
-                }
+                if (curProj.symbol) { ctx.font = '20px Arial'; ctx.textAlign = 'center'; ctx.textBaseline='middle'; ctx.fillText(curProj.symbol, 0, 0); } 
+                else { ctx.beginPath(); ctx.arc(0,0, 4, 0, Math.PI*2); ctx.fill(); }
             }));
 
             particles.forEach(p => drawAt(p.x, p.y, () => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(0,0, 4, 4); }));
