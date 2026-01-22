@@ -173,28 +173,43 @@
         }
 
         // --- PROFANITY FILTER ---
-        // Add words here you want to block. 
+        // Add words here you want to block. MUST BE UPPERCASE HERE.
         // Example: "BADWORD", "OFFENSIVE"
-        const bannedWords = ["NIGGER", "NIGGA", "GAY", "FUCK", "SHIT", "BITCH", "STUPID"]; 
+        const bannedWords = ["NIGGER", "NIGGA", "RAPE", "FUCK", "SHIT", "BITCH", "JEW", "SHNIG"]; 
 
         // --- CLOUD FUNCTIONS ---
-        async function saveScoreToCloud(name, score) {
+        // Now uses UserID so changing names updates the SAME score entry
+        async function saveScoreToCloud(userId, name, score) {
             if(!db) return;
             try {
-                // Check if user already exists
-                const q = query(collection(db, "leaderboard"), where("name", "==", name));
+                // Check if USER ID already exists
+                const q = query(collection(db, "leaderboard"), where("uid", "==", userId));
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
                     querySnapshot.forEach(async (docSnap) => {
                         const oldScore = docSnap.data().score;
+                        // Update name regardless, update score if higher
                         if (score > oldScore) {
-                            await updateDoc(doc(db, "leaderboard", docSnap.id), { score: score, date: Date.now() });
-                            console.log("Updated High Score");
+                            await updateDoc(doc(db, "leaderboard", docSnap.id), { 
+                                score: score, 
+                                name: name, // Update name in case they changed it
+                                date: Date.now() 
+                            });
+                            console.log("Updated High Score & Name");
+                        } else {
+                            // Even if score isn't higher, update the name so leaderboard is current
+                            await updateDoc(doc(db, "leaderboard", docSnap.id), { name: name });
+                            console.log("Updated Name Only");
                         }
                     });
                 } else {
-                    await addDoc(collection(db, "leaderboard"), { name: name, score: score, date: Date.now() });
+                    await addDoc(collection(db, "leaderboard"), { 
+                        uid: userId, // Save the ID
+                        name: name, 
+                        score: score, 
+                        date: Date.now() 
+                    });
                     console.log("Created New Score Entry");
                 }
             } catch (e) { console.error("Error saving score: ", e); }
@@ -273,6 +288,7 @@
         
         let totalCoins = 0;
         let playerName = "";
+        let playerUid = ""; // Unique ID for this user
         let inventory = ['skin_default', 'bg_default', 'proj_orb', 'trail_none', 'ui_default', 'death_default']; 
         let equipped = {
             skin: 'skin_default', bg: 'bg_default', proj: 'proj_orb', trail: 'trail_none', ui: 'ui_default', death: 'death_default'
@@ -309,7 +325,12 @@
                 totalCoins = data.coins || 0;
                 playerName = data.name || "";
                 inventory = data.inventory || inventory;
+                // Load or Create Unique ID
+                playerUid = data.uid || "user_" + Date.now() + "_" + Math.floor(Math.random()*10000);
                 if(data.equipped) equipped = { ...equipped, ...data.equipped };
+            } else {
+                // First time user ID
+                playerUid = "user_" + Date.now() + "_" + Math.floor(Math.random()*10000);
             }
             if (!playerName || playerName.trim() === "") {
                 playerName = "GUEST" + Math.floor(1000 + Math.random() * 9000);
@@ -320,15 +341,17 @@
         }
 
         function saveData() {
-            let data = { coins: totalCoins, name: playerName, inventory: inventory, equipped: equipped };
+            let data = { coins: totalCoins, name: playerName, inventory: inventory, equipped: equipped, uid: playerUid };
             localStorage.setItem('neon_swarm_data_v3', JSON.stringify(data));
         }
         
         function updateName(val) { 
+            // Convert everything to UPPERCASE for the check
             let upper = val.toUpperCase();
             
             // PROFANITY CHECK
             let invalid = false;
+            // This checks if the uppercase input matches any uppercase blocked word
             bannedWords.forEach(w => { if(upper.includes(w)) invalid = true; });
 
             const btn = document.getElementById('btn-start');
@@ -340,7 +363,7 @@
             } else {
                 btn.disabled = false;
                 err.style.display = 'none';
-                playerName = upper; 
+                playerName = upper; // Save as uppercase
                 saveData(); 
             }
         }
@@ -672,7 +695,7 @@
         
         function triggerDeath() {
             gameActive = false; isDying = true; deathTimer = 0;
-            if(player.score > 0) saveScoreToCloud(playerName, player.score);
+            if(player.score > 0) saveScoreToCloud(playerUid, playerName, player.score);
         }
 
         function drawDeathAnim() {
