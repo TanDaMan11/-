@@ -1,173 +1,183 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Smash Arena</title>
+    <title>1v1 Platformer Fight</title>
     <style>
-        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; background: #222; overflow: hidden; font-family: 'Courier New', sans-serif; }
         canvas { display: block; }
-        
-        /* UI LAYERS */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        #menu { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.9); z-index: 10;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            pointer-events: auto; color: white;
-        }
-        
-        /* CARDS */
-        .card-row { display: flex; gap: 15px; margin-bottom: 20px; }
-        .card { 
-            border: 2px solid #444; background: #222; padding: 20px; width: 140px; 
-            text-align: center; cursor: pointer; border-radius: 8px; transition: 0.1s;
-        }
-        .card:hover { transform: scale(1.05); border-color: white; }
-        .selected { border-color: #0f0; background: #002200; box-shadow: 0 0 10px #0f0; }
-        
-        button { 
-            padding: 15px 50px; font-size: 24px; background: #d00; color: white; border: none; 
-            cursor: pointer; font-weight: bold; border-radius: 5px;
-        }
-        button:hover { background: #f00; }
-
-        /* HUD */
-        #hud { display: none; padding: 20px; color: white; }
-        .hp-box { width: 300px; height: 20px; border: 2px solid white; background: #333; }
-        .hp-fill { height: 100%; width: 100%; background: #0f0; transition: width 0.1s; }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: white; pointer-events: none;}
     </style>
 </head>
 <body>
-
-    <div id="menu">
-        <h1 style="font-size:60px; margin:0; color: #ff0055;">SUPER SMASH ARENA</h1>
-        <p id="status">Connecting...</p>
-        
-        <div class="card-row">
-            <div class="card selected" onclick="setWep('gun', this)">
-                <h2>🔫</h2><b>Rifle</b><br><small>Range</small>
-            </div>
-            <div class="card" onclick="setWep('shotgun', this)">
-                <h2>💥</h2><b>Shotgun</b><br><small>Burst</small>
-            </div>
-            <div class="card" onclick="setWep('axe', this)">
-                <h2>🪓</h2><b>Axe</b><br><small>Heavy</small>
-            </div>
-        </div>
-        <button onclick="startGame()">READY TO FIGHT</button>
+    <div id="ui">
+        <h2>WASD to Move | SPACE to Jump | CLICK to Attack</h2>
+        <div id="scores"></div>
     </div>
-
-    <div id="ui-layer">
-        <div id="hud">
-            <h2 id="kills">Kills: 0</h2>
-            <div class="hp-box"><div id="hp" class="hp-fill"></div></div>
-        </div>
-    </div>
-
-    <canvas id="game"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        // --- 1. SETUP ---
-        const canvas = document.getElementById('game');
+        const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const socket = io('https://8o2lymxge7.onrender.com');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        // Game State
-        let myId = null;
+        // --- 1. CONNECT TO SERVER ---
+        // REPLACE THIS WITH YOUR RENDER URL!
+        const socket = io('https://YOUR-RENDER-URL-HERE.onrender.com');
+
         let players = {};
-        let myWep = 'gun';
-        let camera = {x:0, y:0};
         
-        // Physics
-        const MAP_W = 2500, MAP_H = 1000;
-        let pos = {x:100, y:0, vx:0, vy:0, grounded:false};
-        const keys = {w:false, a:false, s:false, d:false};
-        let mouse = {x:0, y:0, angle:0};
-
-        // Resize
-        function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
-        window.onresize = resize; resize();
-
-        // --- 2. MENU LOGIC ---
-        function setWep(w, el) {
-            myWep = w;
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-            el.classList.add('selected');
-        }
-
-        function startGame() {
-            if(!myId) return alert("Still connecting... please wait 2 seconds.");
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('hud').style.display = 'block';
-            
-            // THE CRITICAL LINE: FORCE THE JOIN
-            socket.emit('joinGame', myWep);
-        }
-
-        socket.on('connect', () => { 
-            myId = socket.id; 
-            document.getElementById('status').innerText = "Connected! Select Weapon:";
-        });
-        
-        socket.on('playerCount', c => {
-            if(document.getElementById('menu').style.display !== 'none') {
-                document.getElementById('status').innerText = c + " Fighters Online";
-            }
-        });
-
-        // --- 3. INPUTS ---
-        window.onkeydown = e => keys[e.key.toLowerCase()] = true;
-        window.onkeyup = e => keys[e.key.toLowerCase()] = false;
-        window.onmousemove = e => {
-            mouse.angle = Math.atan2(e.clientY - canvas.height/2, e.clientX - canvas.width/2);
-        };
-        window.onmousedown = () => socket.emit('attack', {type:'primary', angle:mouse.angle});
-
-        let lastSpecial = 0;
-        function checkSpecial() {
-            if(keys.s && Date.now() - lastSpecial > 1500) {
-                lastSpecial = Date.now();
-                socket.emit('attack', {type:'special', angle:mouse.angle});
-                // Axe Slam Logic
-                if(myWep === 'axe' && !pos.grounded) pos.vy = 25; 
-            }
-        }
-
-        // --- 4. GAME LOOP ---
+        // --- 2. PHYSICS ---
+        const GRAVITY = 0.8;
+        const JUMP_FORCE = -15;
+        const SPEED = 6;
         const platforms = [
-            {x:0, y:MAP_H-50, w:MAP_W, h:50}, // Floor
-            {x:400, y:700, w:400, h:20},      // Plat 1
-            {x:1200, y:600, w:500, h:20},     // Plat 2
-            {x:2000, y:500, w:300, h:20},     // Plat 3
-            {x:900, y:400, w:200, h:20}       // High Plat
+            { x: 100, y: 500, w: 200, h: 20 },
+            { x: 500, y: 500, w: 200, h: 20 },
+            { x: 300, y: 350, w: 200, h: 20 },
+            { x: 0, y: window.innerHeight - 50, w: window.innerWidth, h: 50 }
         ];
 
-        let fx = [];
+        // Local Player State
+        let myPos = { x: 100, y: 0, vx: 0, vy: 0, grounded: false, facing: 1 };
+        const keys = { a: false, d: false };
 
-        function update() {
-            // Only update physics if I am actually playing
-            if(myId && players[myId] && players[myId].active) {
-                
-                // Move
-                pos.vx = 0;
-                if(keys.a) pos.vx = -10;
-                if(keys.d) pos.vx = 10;
-                
-                // Jump (Snappy)
-                if(keys.w && pos.grounded) { pos.vy = -20; pos.grounded = false; }
-                
-                checkSpecial();
+        // --- 3. INPUTS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'a') keys.a = true;
+            if (e.key === 'd') keys.d = true;
+            if (e.key === ' ') {
+                if (myPos.grounded) { myPos.vy = JUMP_FORCE; myPos.grounded = false; }
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'a') keys.a = false;
+            if (e.key === 'd') keys.d = false;
+        });
+        window.addEventListener('mousedown', () => {
+            // Tell server we want to attack
+            socket.emit('attack');
+        });
 
-                // Gravity
-                pos.vy += 0.9;
-                pos.x += pos.vx;
-                pos.y += pos.vy;
+        // --- 4. GAME LOOP ---
+        function updatePhysics() {
+            myPos.vx = 0;
+            if (keys.a) { myPos.vx = -SPEED; myPos.facing = -1; }
+            if (keys.d) { myPos.vx = SPEED; myPos.facing = 1; }
 
-                // Bounds
-                if(pos.x < 0) pos.x = 0;
-                if(pos.x > MAP_W) pos.x = MAP_W;
+            myPos.vy += GRAVITY;
+            myPos.x += myPos.vx;
+            myPos.y += myPos.vy;
+            myPos.grounded = false;
 
-                // Collision
-                pos.grounded = false;
-                for(let p of platforms) {
-                    if(pos.vy >= 0
+            // Platform Collision
+            for (let plat of platforms) {
+                if (myPos.vy >= 0 &&
+                    myPos.x + 20 > plat.x && myPos.x - 20 < plat.x + plat.w &&
+                    myPos.y + 20 > plat.y && myPos.y + 20 < plat.y + plat.h + 10
+                ) {
+                    myPos.y = plat.y - 20;
+                    myPos.vy = 0;
+                    myPos.grounded = true;
+                }
+            }
+            
+            // Send position to server
+            if (players[socket.id]) {
+                socket.emit('playerMovement', { 
+                    x: myPos.x, y: myPos.y, direction: myPos.facing 
+                });
+            }
+        }
+
+        let attackAnimations = []; // Store active attack effects
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Platforms
+            ctx.fillStyle = "#666";
+            for (let p of platforms) ctx.fillRect(p.x, p.y, p.w, p.h);
+
+            updatePhysics();
+
+            // Draw Players
+            for (let id in players) {
+                const p = players[id];
+                let drawX = (id === socket.id) ? myPos.x : p.x;
+                let drawY = (id === socket.id) ? myPos.y : p.y;
+                let facing = (id === socket.id) ? myPos.facing : (p.direction || 1);
+
+                // Body
+                ctx.fillStyle = p.color;
+                ctx.fillRect(drawX - 20, drawY - 20, 40, 40);
+
+                // Eyes (Direction)
+                ctx.fillStyle = "white";
+                if (facing === 1) ctx.fillRect(drawX + 5, drawY - 15, 10, 10);
+                else ctx.fillRect(drawX - 15, drawY - 15, 10, 10);
+
+                // Health Bar
+                ctx.fillStyle = "red";
+                ctx.fillRect(drawX - 20, drawY - 35, 40, 5);
+                ctx.fillStyle = "#0f0";
+                ctx.fillRect(drawX - 20, drawY - 35, 40 * (p.health / 100), 5);
+            }
+
+            // Draw Attacks (White Flash)
+            for (let i = 0; i < attackAnimations.length; i++) {
+                const anim = attackAnimations[i];
+                if (players[anim.id]) {
+                    const p = players[anim.id];
+                    let x = (anim.id === socket.id) ? myPos.x : p.x;
+                    let y = (anim.id === socket.id) ? myPos.y : p.y;
+                    let dir = (anim.id === socket.id) ? myPos.facing : p.direction;
+
+                    ctx.fillStyle = "white";
+                    // Draw a "sword" box in front of player
+                    ctx.fillRect(x + (dir * 25), y - 10, 30, 20); 
+                }
+                anim.life--;
+            }
+            // Remove old animations
+            attackAnimations = attackAnimations.filter(a => a.life > 0);
+
+            requestAnimationFrame(draw);
+        }
+
+        // --- 5. SOCKET EVENTS ---
+        socket.on('currentPlayers', (serverPlayers) => {
+            players = serverPlayers;
+            requestAnimationFrame(draw);
+        });
+        socket.on('newPlayer', (p) => players[p.id] = p);
+        socket.on('playerMoved', (p) => {
+            if (players[p.id]) {
+                players[p.id].x = p.x;
+                players[p.id].y = p.y;
+                players[p.id].direction = p.direction;
+            }
+        });
+        socket.on('playerAttack', (id) => {
+            attackAnimations.push({ id: id, life: 10 }); // Show for 10 frames
+        });
+        socket.on('updateHealth', (data) => {
+            if (players[data.id]) players[data.id].health = data.health;
+        });
+        socket.on('respawn', (p) => {
+            if (players[p.id]) {
+                players[p.id].health = 100;
+                players[p.id].x = p.x;
+                players[p.id].y = p.y;
+                if(p.id === socket.id) { myPos.x = p.x; myPos.y = p.y; }
+            }
+        });
+        socket.on('scoreUpdate', (data) => {
+            if (players[data.id]) players[data.id].score = data.score;
+        });
+        socket.on('disconnectUser', (id) => delete players[id]);
+
+    </script>
+</body>
+</html>
