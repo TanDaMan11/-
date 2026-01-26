@@ -1,338 +1,173 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Platformer Arena</title>
+    <title>Smash Arena</title>
     <style>
-        body { margin: 0; background: #1a1a1a; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
         canvas { display: block; }
         
-        /* UI OVERLAY */
-        #gameUI { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        #hud { padding: 20px; color: white; display: none; }
-        
-        /* Health Bar */
-        .bar-container { width: 300px; height: 15px; background: #444; margin-top: 5px; border: 2px solid white; }
-        .hp-bar { height: 100%; background: #0f0; width: 100%; transition: width 0.1s; }
-
-        /* MAIN MENU */
+        /* UI LAYERS */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         #menu { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.95); 
-            display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; 
-            color: white; pointer-events: auto; z-index: 10;
+            background: rgba(0,0,0,0.9); z-index: 10;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: auto; color: white;
         }
-        h1 { font-size: 70px; margin-bottom: 10px; color: #ff0055; text-transform: uppercase; letter-spacing: 5px; }
         
-        /* Player Count Style */
-        #playerCount { font-size: 24px; color: #0f0; margin-bottom: 30px; font-weight: bold; }
+        /* CARDS */
+        .card-row { display: flex; gap: 15px; margin-bottom: 20px; }
+        .card { 
+            border: 2px solid #444; background: #222; padding: 20px; width: 140px; 
+            text-align: center; cursor: pointer; border-radius: 8px; transition: 0.1s;
+        }
+        .card:hover { transform: scale(1.05); border-color: white; }
+        .selected { border-color: #0f0; background: #002200; box-shadow: 0 0 10px #0f0; }
+        
+        button { 
+            padding: 15px 50px; font-size: 24px; background: #d00; color: white; border: none; 
+            cursor: pointer; font-weight: bold; border-radius: 5px;
+        }
+        button:hover { background: #f00; }
 
-        .weapon-container { display: flex; gap: 20px; }
-        .weapon-card {
-            width: 150px; padding: 20px; text-align: center; cursor: pointer;
-            border: 2px solid #444; background: #222; color: white; border-radius: 8px;
-            transition: 0.2s;
-        }
-        .weapon-card:hover { transform: translateY(-5px); border-color: #ff0055; }
-        .selected { border-color: #0f0; background: #002200; box-shadow: 0 0 15px #0f0; }
-        .weapon-icon { font-size: 40px; display: block; margin-bottom: 10px; }
-        
-        #joinBtn {
-            margin-top: 40px; padding: 15px 60px; font-size: 30px; 
-            background: #ff0055; color: white; border: none; cursor: pointer; 
-            font-weight: bold; border-radius: 5px;
-        }
-        #joinBtn:hover { background: #ff3377; box-shadow: 0 0 20px #ff0055; }
+        /* HUD */
+        #hud { display: none; padding: 20px; color: white; }
+        .hp-box { width: 300px; height: 20px; border: 2px solid white; background: #333; }
+        .hp-fill { height: 100%; width: 100%; background: #0f0; transition: width 0.1s; }
     </style>
 </head>
 <body>
 
     <div id="menu">
-        <h1>Battle Arena</h1>
-        <p id="playerCount">Connecting to server...</p>
+        <h1 style="font-size:60px; margin:0; color: #ff0055;">SUPER SMASH ARENA</h1>
+        <p id="status">Connecting...</p>
         
-        <h3>SELECT YOUR LOADOUT</h3>
-        <div class="weapon-container">
-            <div class="weapon-card selected" onclick="selectWeapon('gun', this)">
-                <span class="weapon-icon">🔫</span>
-                <strong>RIFLE</strong><br>
-                <small style="color:#aaa">Range: High<br>Special: Knife Stab</small>
+        <div class="card-row">
+            <div class="card selected" onclick="setWep('gun', this)">
+                <h2>🔫</h2><b>Rifle</b><br><small>Range</small>
             </div>
-            <div class="weapon-card" onclick="selectWeapon('shotgun', this)">
-                <span class="weapon-icon">💥</span>
-                <strong>SHOTGUN</strong><br>
-                <small style="color:#aaa">Range: Low<br>Special: Execution</small>
+            <div class="card" onclick="setWep('shotgun', this)">
+                <h2>💥</h2><b>Shotgun</b><br><small>Burst</small>
             </div>
-            <div class="weapon-card" onclick="selectWeapon('axe', this)">
-                <span class="weapon-icon">🪓</span>
-                <strong>AXE</strong><br>
-                <small style="color:#aaa">Range: Melee<br>Special: Ground Slam</small>
+            <div class="card" onclick="setWep('axe', this)">
+                <h2>🪓</h2><b>Axe</b><br><small>Heavy</small>
             </div>
         </div>
-
-        <button id="joinBtn" onclick="joinGame()">JOIN FIGHT</button>
+        <button onclick="startGame()">READY TO FIGHT</button>
     </div>
 
-    <div id="gameUI">
+    <div id="ui-layer">
         <div id="hud">
-            <h2 id="scoreDisplay">Kills: 0</h2>
-            <div style="font-weight:bold;">HEALTH</div>
-            <div class="bar-container"><div id="healthBar" class="hp-bar"></div></div>
+            <h2 id="kills">Kills: 0</h2>
+            <div class="hp-box"><div id="hp" class="hp-fill"></div></div>
         </div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="game"></canvas>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const canvas = document.getElementById('gameCanvas');
+        // --- 1. SETUP ---
+        const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        
-        // --- CONNECT TO SERVER ---
         const socket = io('https://8o2lymxge7.onrender.com');
 
+        // Game State
         let myId = null;
         let players = {};
-        let camera = { x: 0, y: 0 };
-        let selectedWeapon = 'gun';
+        let myWep = 'gun';
+        let camera = {x:0, y:0};
         
-        const MAP_WIDTH = 2500;
-        const MAP_HEIGHT = 1000;
+        // Physics
+        const MAP_W = 2500, MAP_H = 1000;
+        let pos = {x:100, y:0, vx:0, vy:0, grounded:false};
+        const keys = {w:false, a:false, s:false, d:false};
+        let mouse = {x:0, y:0, angle:0};
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        // Resize
+        function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+        window.onresize = resize; resize();
+
+        // --- 2. MENU LOGIC ---
+        function setWep(w, el) {
+            myWep = w;
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
         }
-        window.addEventListener('resize', resize);
-        resize();
 
-        // --- MENU LOGIC ---
-        function selectWeapon(w, element) {
-            selectedWeapon = w;
-            document.querySelectorAll('.weapon-card').forEach(b => b.classList.remove('selected'));
-            element.classList.add('selected');
-        }
-
-        function joinGame() {
+        function startGame() {
+            if(!myId) return alert("Still connecting... please wait 2 seconds.");
             document.getElementById('menu').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
-            socket.emit('joinGame', selectedWeapon);
+            
+            // THE CRITICAL LINE: FORCE THE JOIN
+            socket.emit('joinGame', myWep);
         }
 
-        socket.on('connect', () => { myId = socket.id; });
-        
-        // UPDATE PLAYER COUNT
-        socket.on('playerCount', (count) => {
-            const el = document.getElementById('playerCount');
-            if(el) el.innerText = "ONLINE: " + count;
-        });
-
-        // --- CONTROLS ---
-        const keys = { w: false, a: false, s: false, d: false };
-        let mouse = { x: 0, y: 0, angle: 0 };
-        let myPos = { x: 100, y: 0, vx: 0, vy: 0, grounded: false };
-
-        window.addEventListener('keydown', e => { 
-            if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; 
-        });
-        window.addEventListener('keyup', e => { 
-            if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; 
+        socket.on('connect', () => { 
+            myId = socket.id; 
+            document.getElementById('status').innerText = "Connected! Select Weapon:";
         });
         
-        window.addEventListener('mousemove', e => {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            mouse.angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+        socket.on('playerCount', c => {
+            if(document.getElementById('menu').style.display !== 'none') {
+                document.getElementById('status').innerText = c + " Fighters Online";
+            }
         });
 
-        window.addEventListener('mousedown', () => {
-            socket.emit('attack', { type: 'primary', angle: mouse.angle });
-        });
+        // --- 3. INPUTS ---
+        window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+        window.onmousemove = e => {
+            mouse.angle = Math.atan2(e.clientY - canvas.height/2, e.clientX - canvas.width/2);
+        };
+        window.onmousedown = () => socket.emit('attack', {type:'primary', angle:mouse.angle});
 
         let lastSpecial = 0;
         function checkSpecial() {
-            if (keys.s && Date.now() - lastSpecial > 1500) { 
-                socket.emit('attack', { type: 'special', angle: mouse.angle });
+            if(keys.s && Date.now() - lastSpecial > 1500) {
                 lastSpecial = Date.now();
-                if (selectedWeapon === 'axe' && !myPos.grounded) {
-                    myPos.vy = 25; 
-                }
+                socket.emit('attack', {type:'special', angle:mouse.angle});
+                // Axe Slam Logic
+                if(myWep === 'axe' && !pos.grounded) pos.vy = 25; 
             }
         }
 
+        // --- 4. GAME LOOP ---
         const platforms = [
-            { x: 0, y: MAP_HEIGHT - 50, w: MAP_WIDTH, h: 50 },
-            { x: 200, y: 700, w: 300, h: 20 },
-            { x: 600, y: 550, w: 200, h: 20 },
-            { x: 1000, y: 750, w: 500, h: 20 },
-            { x: 1100, y: 450, w: 300, h: 20 },
-            { x: 1600, y: 600, w: 200, h: 20 },
-            { x: 2000, y: 500, w: 400, h: 20 }
+            {x:0, y:MAP_H-50, w:MAP_W, h:50}, // Floor
+            {x:400, y:700, w:400, h:20},      // Plat 1
+            {x:1200, y:600, w:500, h:20},     // Plat 2
+            {x:2000, y:500, w:300, h:20},     // Plat 3
+            {x:900, y:400, w:200, h:20}       // High Plat
         ];
 
-        function updatePhysics() {
-            myPos.vx = 0;
-            if (keys.a) myPos.vx = -9;
-            if (keys.d) myPos.vx = 9;
+        let fx = [];
 
-            if (keys.w && myPos.grounded) {
-                myPos.vy = -18;
-                myPos.grounded = false;
-            }
-
-            checkSpecial();
-
-            myPos.vy += 0.8;
-            myPos.x += myPos.vx;
-            myPos.y += myPos.vy;
-
-            if (myPos.x < 0) myPos.x = 0;
-            if (myPos.x > MAP_WIDTH) myPos.x = MAP_WIDTH;
-
-            myPos.grounded = false;
-            for (let p of platforms) {
-                if (myPos.vy >= 0 &&
-                    myPos.x + 20 > p.x && myPos.x - 20 < p.x + p.w &&
-                    myPos.y + 20 > p.y && myPos.y + 20 < p.y + p.h + 20
-                ) {
-                    myPos.y = p.y - 20;
-                    myPos.vy = 0;
-                    myPos.grounded = true;
-                }
-            }
-
-            socket.emit('playerMovement', { 
-                x: myPos.x, 
-                y: myPos.y, 
-                facing: (mouse.angle > -Math.PI/2 && mouse.angle < Math.PI/2) ? 1 : -1,
-                angle: mouse.angle
-            });
-
-            camera.x = myPos.x - canvas.width / 2;
-            camera.y = myPos.y - canvas.height / 2;
-
-            if (camera.x < 0) camera.x = 0;
-            if (camera.y < 0) camera.y = 0;
-            if (camera.x > MAP_WIDTH - canvas.width) camera.x = MAP_WIDTH - canvas.width;
-            if (camera.y > MAP_HEIGHT - canvas.height) camera.y = MAP_HEIGHT - canvas.height;
-        }
-
-        let fx = []; 
-
-        function draw() {
-            if (myId && players[myId] && players[myId].isPlaying) updatePhysics();
-
-            ctx.fillStyle = "#222";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.save();
-            ctx.translate(-camera.x, -camera.y);
-
-            ctx.strokeStyle = "#444";
-            ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-
-            ctx.fillStyle = "#666";
-            for (let p of platforms) ctx.fillRect(p.x, p.y, p.w, p.h);
-
-            for (let id in players) {
-                const p = players[id];
-                if (!p.isPlaying) continue;
-
-                let x = (id === myId) ? myPos.x : p.x;
-                let y = (id === myId) ? myPos.y : p.y;
-                let ang = (id === myId) ? mouse.angle : p.angle;
-
-                ctx.fillStyle = p.color;
-                ctx.fillRect(x - 20, y - 20, 40, 40);
-
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(ang);
+        function update() {
+            // Only update physics if I am actually playing
+            if(myId && players[myId] && players[myId].active) {
                 
-                if (p.weapon === 'gun') {
-                    ctx.fillStyle = "#bbb";
-                    ctx.fillRect(15, -4, 35, 8); 
-                } else if (p.weapon === 'shotgun') {
-                    ctx.fillStyle = "#666";
-                    ctx.fillRect(15, -8, 25, 16); 
-                } else if (p.weapon === 'axe') {
-                    ctx.fillStyle = "#8B4513"; 
-                    ctx.fillRect(10, -5, 40, 10); 
-                    ctx.fillStyle = "silver"; 
-                    ctx.beginPath();
-                    ctx.moveTo(40, -5);
-                    ctx.lineTo(60, -25);
-                    ctx.lineTo(60, 25);
-                    ctx.lineTo(40, 5);
-                    ctx.fill();
-                }
-                ctx.restore();
-
-                if (id !== myId) {
-                    ctx.fillStyle = "red";
-                    ctx.fillRect(x - 20, y - 35, 40, 5);
-                    ctx.fillStyle = "#0f0";
-                    ctx.fillRect(x - 20, y - 35, 40 * (p.health / 100), 5);
-                }
-            }
-
-            ctx.lineWidth = 2;
-            for (let i = 0; i < fx.length; i++) {
-                let f = fx[i];
-                ctx.strokeStyle = (f.type === 'special') ? "red" : "yellow";
+                // Move
+                pos.vx = 0;
+                if(keys.a) pos.vx = -10;
+                if(keys.d) pos.vx = 10;
                 
-                ctx.beginPath();
-                ctx.moveTo(f.x, f.y);
-                let len = (f.weapon === 'shotgun') ? 100 : 800;
-                if (f.weapon === 'axe') len = 80;
+                // Jump (Snappy)
+                if(keys.w && pos.grounded) { pos.vy = -20; pos.grounded = false; }
                 
-                ctx.lineTo(f.x + Math.cos(f.angle) * len, f.y + Math.sin(f.angle) * len);
-                ctx.stroke();
-                
-                f.life--;
-            }
-            fx = fx.filter(f => f.life > 0);
+                checkSpecial();
 
-            ctx.restore(); 
-            requestAnimationFrame(draw);
-        }
+                // Gravity
+                pos.vy += 0.9;
+                pos.x += pos.vx;
+                pos.y += pos.vy;
 
-        socket.on('updatePlayers', (p) => { players = p; });
-        socket.on('playerMoved', (p) => { if(players[p.id]) Object.assign(players[p.id], p); });
-        
-        socket.on('updateHealth', (data) => {
-            if (players[data.id]) {
-                players[data.id].health = data.health;
-                if (data.id === myId) document.getElementById('healthBar').style.width = data.health + "%";
-            }
-        });
+                // Bounds
+                if(pos.x < 0) pos.x = 0;
+                if(pos.x > MAP_W) pos.x = MAP_W;
 
-        socket.on('attackAnim', (data) => {
-            if (players[data.id]) {
-                let p = players[data.id];
-                let x = (data.id === myId) ? myPos.x : p.x;
-                let y = (data.id === myId) ? myPos.y : p.y;
-                fx.push({ x: x, y: y, angle: data.angle, life: 5, weapon: data.weapon, type: data.type });
-            }
-        });
-
-        socket.on('scoreUpdate', (data) => {
-            if (players[data.id]) players[data.id].score = data.score;
-            if (data.id === myId) document.getElementById('scoreDisplay').innerText = "Kills: " + data.score;
-        });
-
-        socket.on('respawn', (p) => {
-            if (players[p.id]) {
-                Object.assign(players[p.id], p);
-                if (p.id === myId) {
-                    myPos.x = p.x; myPos.y = p.y;
-                    document.getElementById('healthBar').style.width = "100%";
-                }
-            }
-        });
-
-        socket.on('disconnectUser', (id) => delete players[id]);
-        requestAnimationFrame(draw);
-    </script>
-</body>
-</html>
+                // Collision
+                pos.grounded = false;
+                for(let p of platforms) {
+                    if(pos.vy >= 0
