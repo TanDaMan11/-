@@ -4,80 +4,84 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 
-// ALLOW GITHUB TO CONNECT
-const io = new Server(server, {
-  cors: {
-    origin: "*", 
-    methods: ["GET", "POST"]
-  }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 let players = {};
+const MAP_WIDTH = 2000;
+const MAP_HEIGHT = 1000;
 
 io.on("connection", (socket) => {
-  console.log("Fighter joined:", socket.id);
+  console.log("User connected:", socket.id);
 
-  // 1. Initialize Player
+  // 1. INSTANT SPAWN (No Join Button needed)
   players[socket.id] = {
-    x: 100,
-    y: 0,
+    id: socket.id,
+    x: Math.random() * 500 + 100,
+    y: 100,
     color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
-    direction: 1, // 1 = Right, -1 = Left
     health: 100,
     score: 0,
-    id: socket.id
+    weapon: 'rifle', // Default weapon
+    angle: 0
   };
 
-  // 2. Send data to client
-  socket.emit("currentPlayers", players);
-  socket.broadcast.emit("newPlayer", players[socket.id]);
+  io.emit("updatePlayers", players);
 
-  // 3. Handle Movement
+  // 2. MOVEMENT & ANGLE
   socket.on("playerMovement", (data) => {
     if (players[socket.id]) {
       players[socket.id].x = data.x;
       players[socket.id].y = data.y;
-      players[socket.id].direction = data.direction;
+      players[socket.id].angle = data.angle; // We need angle for shooting
       socket.broadcast.emit("playerMoved", players[socket.id]);
     }
   });
 
-  // 4. Handle Attack (Server Logic)
+  // 3. SWITCH WEAPON
+  socket.on("switchWeapon", (weaponType) => {
+    if (players[socket.id]) {
+      players[socket.id].weapon = weaponType;
+      io.emit("updatePlayers", players); // Tell everyone I changed weapon
+    }
+  });
+
+  // 4. COMBAT LOGIC
   socket.on("attack", () => {
-    const attacker = players[socket.id];
-    if (!attacker) return;
+    const p = players[socket.id];
+    if (!p) return;
 
-    // Tell everyone to show the attack animation
-    io.emit("playerAttack", socket.id);
+    // Weapon Stats
+    let range = 800, damage = 10, spread = 0.1;
+    if (p.weapon === 'shotgun') { range = 300; damage = 40; spread = 0.5; }
+    if (p.weapon === 'axe') { range = 100; damage = 35; spread = 1.0; }
 
-    // Check if anyone was hit
+    io.emit("attackAnim", { id: socket.id, weapon: p.weapon, angle: p.angle });
+
+    // Check Hits
     for (let enemyId in players) {
       if (enemyId !== socket.id) {
         const enemy = players[enemyId];
+        const dist = Math.sqrt(Math.pow(enemy.x - p.x, 2) + Math.pow(enemy.y - p.y, 2));
         
-        // Simple Distance Check
-        const dx = attacker.x - enemy.x;
-        const dy = attacker.y - enemy.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Calculate Angle Difference
+        const angleToEnemy = Math.atan2(enemy.y - p.y, enemy.x - p.x);
+        let angleDiff = angleToEnemy - p.angle;
+        // Normalize angle
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-        // If close enough (60 pixels), take damage
-        if (distance < 60) {
-          enemy.health -= 10;
-          io.emit("updateHealth", { id: enemyId, health: enemy.health });
-
-          // Check for Death
-          if (enemy.health <= 0) {
-            attacker.score += 1;
-            
+        if (dist < range && Math.abs(angleDiff) < spread) {
+          players[enemyId].health -= damage;
+          
+          if (players[enemyId].health <= 0) {
             // Respawn Enemy
-            enemy.health = 100;
-            enemy.x = Math.floor(Math.random() * 500);
-            enemy.y = 0;
-
-            // Notify everyone
-            io.emit("scoreUpdate", { id: socket.id, score: attacker.score });
-            io.emit("respawn", enemy);
+            players[enemyId].health = 100;
+            players[enemyId].x = Math.random() * 500;
+            players[enemyId].y = 0;
+            p.score++;
           }
+          
+          io.emit("updateHealth", players);
         }
       }
     }
@@ -85,11 +89,9 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     delete players[socket.id];
-    io.emit("disconnectUser", socket.id);
+    io.emit("updatePlayers", players);
   });
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+server.listen(port, () => console.log(`Server running on port ${port}`));
