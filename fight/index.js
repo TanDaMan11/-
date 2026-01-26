@@ -11,77 +11,69 @@ let players = {};
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // 1. INSTANT SPAWN
-  // We create the player immediately. No waiting.
-  players[socket.id] = {
-    id: socket.id,
-    x: Math.random() * 400 + 100,
-    y: 100,
-    color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
-    health: 100,
-    score: 0,
-    weapon: 'rifle', // Default
-    facing: 1 // 1 = Right, -1 = Left
-  };
+  // 1. Send current players to the new person (so they see others)
+  socket.emit("updatePlayers", players);
 
-  // Send the full player list to everyone
-  io.emit("updatePlayers", players);
+  // 2. LISTEN FOR THE JOIN SIGNAL
+  // This is what spawns you!
+  socket.on("joinGame", (data) => {
+    players[socket.id] = {
+      id: socket.id,
+      x: 100, // Spawn Point X
+      y: 0,   // Spawn Point Y
+      w: 40, h: 40,
+      color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
+      health: 100,
+      score: 0,
+      weapon: data.weapon || 'rifle',
+      facing: 1
+    };
+    // Tell everyone a new player is here
+    io.emit("updatePlayers", players);
+  });
 
-  // 2. MOVEMENT
+  // 3. MOVEMENT
   socket.on("playerMovement", (data) => {
     if (players[socket.id]) {
       players[socket.id].x = data.x;
       players[socket.id].y = data.y;
       players[socket.id].facing = data.facing;
-      
-      // Broadcast to others (excluding sender to prevent lag/jitter on client)
+      // Broadcast movement to everyone else
       socket.broadcast.emit("playerMoved", players[socket.id]);
     }
   });
 
-  // 3. WEAPON SWITCH
-  socket.on("switchWeapon", (wep) => {
-    if (players[socket.id]) {
-      players[socket.id].weapon = wep;
-      io.emit("updatePlayers", players);
-    }
-  });
-
-  // 4. ATTACK
+  // 4. ATTACK LOGIC
   socket.on("attack", () => {
     const p = players[socket.id];
     if (!p) return;
 
-    // Send animation to everyone
-    io.emit("playerAttack", { id: socket.id, weapon: p.weapon });
+    // Send visual effect
+    io.emit("attackAnim", { id: socket.id, weapon: p.weapon, facing: p.facing });
 
-    // Calculate Hits
-    let range = 400, damage = 10, width = 50;
-    if (p.weapon === 'shotgun') { range = 150; damage = 30; width = 80; }
-    if (p.weapon === 'axe') { range = 60; damage = 25; width = 60; }
+    // Calculate Damage
+    let range = 400, damage = 10, height = 50;
+    if (p.weapon === 'shotgun') { range = 150; damage = 30; height = 100; }
+    if (p.weapon === 'axe') { range = 80; damage = 25; height = 80; }
 
-    // Hit Logic (Side Scroller)
-    for (let enemyId in players) {
-      if (enemyId !== socket.id) {
-        const e = players[enemyId];
-        
-        // Check Y Distance (Vertical overlap)
-        const yDist = Math.abs(e.y - p.y);
-        
-        // Check X Distance (Horizontal range based on facing)
+    for (let id in players) {
+      if (id !== socket.id) {
+        const e = players[id];
         let hit = false;
-        if (p.facing === 1) { // Facing Right
-             if (e.x > p.x && e.x < p.x + range && yDist < width) hit = true;
-        } else { // Facing Left
-             if (e.x < p.x && e.x > p.x - range && yDist < width) hit = true;
-        }
+        let dist = e.x - p.x;
+
+        // Check Direction & Range
+        if (p.facing === 1 && dist > 0 && dist < range) hit = true;  // Right
+        if (p.facing === -1 && dist < 0 && Math.abs(dist) < range) hit = true; // Left
+        
+        // Check Vertical (are they on the same platform?)
+        if (Math.abs(e.y - p.y) > height) hit = false;
 
         if (hit) {
-          players[enemyId].health -= damage;
-          if (players[enemyId].health <= 0) {
-            players[enemyId].health = 100;
-            players[enemyId].x = Math.random() * 400 + 100;
-            players[enemyId].y = 0;
+          e.health -= damage;
+          if (e.health <= 0) {
+            e.health = 100;
+            e.x = Math.random() * 600; e.y = 0; // Respawn
             p.score++;
           }
           io.emit("updatePlayers", players);
