@@ -7,79 +7,84 @@ const { Server } = require("socket.io");
 const io = new Server(server, { cors: { origin: "*" } });
 
 let players = {};
-const MAP_WIDTH = 2000;
-const MAP_HEIGHT = 1000;
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // 1. Add player to list, but mark as INACTIVE (Lobby mode)
+  // 1. INSTANT SPAWN
+  // We create the player immediately. No waiting.
   players[socket.id] = {
     id: socket.id,
-    active: false, // They are in the menu
-    x: 0, y: 0,
-    score: 0
+    x: Math.random() * 400 + 100,
+    y: 100,
+    color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
+    health: 100,
+    score: 0,
+    weapon: 'rifle', // Default
+    facing: 1 // 1 = Right, -1 = Left
   };
 
-  // Send update to everyone so they know player count
+  // Send the full player list to everyone
   io.emit("updatePlayers", players);
-  io.emit("playerCount", Object.keys(players).length);
 
-  // 2. ACTUAL JOIN (When button is clicked)
-  socket.on("joinGame", (weaponChoice) => {
-    if (players[socket.id]) {
-        players[socket.id].active = true;
-        players[socket.id].weapon = weaponChoice;
-        players[socket.id].health = 100;
-        players[socket.id].color = "hsl(" + Math.random() * 360 + ", 100%, 50%)";
-        players[socket.id].x = Math.random() * 500 + 100;
-        players[socket.id].y = 100;
-        players[socket.id].angle = 0;
-        
-        // Tell everyone this player is now playing
-        io.emit("updatePlayers", players);
-    }
-  });
-
-  // 3. MOVEMENT
+  // 2. MOVEMENT
   socket.on("playerMovement", (data) => {
-    if (players[socket.id] && players[socket.id].active) {
+    if (players[socket.id]) {
       players[socket.id].x = data.x;
       players[socket.id].y = data.y;
-      players[socket.id].angle = data.angle;
+      players[socket.id].facing = data.facing;
+      
+      // Broadcast to others (excluding sender to prevent lag/jitter on client)
       socket.broadcast.emit("playerMoved", players[socket.id]);
     }
   });
 
-  // 4. COMBAT
+  // 3. WEAPON SWITCH
+  socket.on("switchWeapon", (wep) => {
+    if (players[socket.id]) {
+      players[socket.id].weapon = wep;
+      io.emit("updatePlayers", players);
+    }
+  });
+
+  // 4. ATTACK
   socket.on("attack", () => {
     const p = players[socket.id];
-    if (!p || !p.active) return;
+    if (!p) return;
 
-    let range = 800, damage = 10, spread = 0.1;
-    if (p.weapon === 'shotgun') { range = 300; damage = 40; spread = 0.5; }
-    if (p.weapon === 'axe') { range = 100; damage = 35; spread = 1.0; }
+    // Send animation to everyone
+    io.emit("playerAttack", { id: socket.id, weapon: p.weapon });
 
-    io.emit("attackAnim", { id: socket.id, weapon: p.weapon, angle: p.angle });
+    // Calculate Hits
+    let range = 400, damage = 10, width = 50;
+    if (p.weapon === 'shotgun') { range = 150; damage = 30; width = 80; }
+    if (p.weapon === 'axe') { range = 60; damage = 25; width = 60; }
 
+    // Hit Logic (Side Scroller)
     for (let enemyId in players) {
-      if (enemyId !== socket.id && players[enemyId].active) {
-        const enemy = players[enemyId];
-        const dist = Math.sqrt(Math.pow(enemy.x - p.x, 2) + Math.pow(enemy.y - p.y, 2));
-        const angleToEnemy = Math.atan2(enemy.y - p.y, enemy.x - p.x);
-        let angleDiff = angleToEnemy - p.angle;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      if (enemyId !== socket.id) {
+        const e = players[enemyId];
+        
+        // Check Y Distance (Vertical overlap)
+        const yDist = Math.abs(e.y - p.y);
+        
+        // Check X Distance (Horizontal range based on facing)
+        let hit = false;
+        if (p.facing === 1) { // Facing Right
+             if (e.x > p.x && e.x < p.x + range && yDist < width) hit = true;
+        } else { // Facing Left
+             if (e.x < p.x && e.x > p.x - range && yDist < width) hit = true;
+        }
 
-        if (dist < range && Math.abs(angleDiff) < spread) {
+        if (hit) {
           players[enemyId].health -= damage;
           if (players[enemyId].health <= 0) {
             players[enemyId].health = 100;
-            players[enemyId].x = Math.random() * 500;
+            players[enemyId].x = Math.random() * 400 + 100;
             players[enemyId].y = 0;
             p.score++;
           }
-          io.emit("updateHealth", players);
+          io.emit("updatePlayers", players);
         }
       }
     }
@@ -88,7 +93,6 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     delete players[socket.id];
     io.emit("updatePlayers", players);
-    io.emit("playerCount", Object.keys(players).length);
   });
 });
 
