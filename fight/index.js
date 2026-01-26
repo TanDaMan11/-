@@ -4,102 +4,79 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 
+// ALLOW GITHUB TO CONNECT
 const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: {
+    origin: "*", 
+    methods: ["GET", "POST"]
+  }
 });
-
-const MAP_WIDTH = 2500;
-const MAP_HEIGHT = 1000;
 
 let players = {};
 
 io.on("connection", (socket) => {
-  console.log("New connection:", socket.id);
+  console.log("Fighter joined:", socket.id);
 
-  // 1. Create a "Spectator" version of the player immediately
-  // This ensures the ID exists in the system right away
+  // 1. Initialize Player
   players[socket.id] = {
-    id: socket.id,
-    active: false, // Not playing yet
-    x: 0, y: 0
+    x: 100,
+    y: 0,
+    color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
+    direction: 1, // 1 = Right, -1 = Left
+    health: 100,
+    score: 0,
+    id: socket.id
   };
 
-  io.emit("updatePlayers", players);
-  io.emit("playerCount", Object.keys(players).length);
+  // 2. Send data to client
+  socket.emit("currentPlayers", players);
+  socket.broadcast.emit("newPlayer", players[socket.id]);
 
-  // 2. The Simple "Join" Logic
-  // When this is received, we simply RESET the player data to "Alive"
-  socket.on("joinGame", (weapon) => {
-    players[socket.id] = {
-      id: socket.id,
-      active: true, // Now they are visible
-      x: Math.floor(Math.random() * (MAP_WIDTH - 200)) + 100,
-      y: 100,
-      color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
-      health: 100,
-      score: 0,
-      weapon: weapon,
-      facing: 1,
-      angle: 0
-    };
-    io.emit("updatePlayers", players);
-  });
-
-  // 3. Movement
+  // 3. Handle Movement
   socket.on("playerMovement", (data) => {
-    if (players[socket.id] && players[socket.id].active) {
+    if (players[socket.id]) {
       players[socket.id].x = data.x;
       players[socket.id].y = data.y;
-      players[socket.id].facing = data.facing;
-      players[socket.id].angle = data.angle;
+      players[socket.id].direction = data.direction;
       socket.broadcast.emit("playerMoved", players[socket.id]);
     }
   });
 
-  // 4. Combat (Smash Bros Style)
-  socket.on("attack", (data) => {
-    const p = players[socket.id];
-    if (!p || !p.active) return;
+  // 4. Handle Attack (Server Logic)
+  socket.on("attack", () => {
+    const attacker = players[socket.id];
+    if (!attacker) return;
 
-    // Show the visual
-    io.emit("attackAnim", { id: socket.id, ...data });
+    // Tell everyone to show the attack animation
+    io.emit("playerAttack", socket.id);
 
-    // Stats
-    let range = 0, damage = 0, spread = 0;
-    if (data.type === 'primary') {
-       if (p.weapon === 'gun') { range = 900; damage = 10; spread = 0.05; }
-       if (p.weapon === 'shotgun') { range = 300; damage = 40; spread = 0.4; }
-       if (p.weapon === 'axe') { range = 130; damage = 35; spread = 0.8; }
-    } else { // Special
-       if (p.weapon === 'gun') { range = 80; damage = 30; spread = 0.5; }
-       if (p.weapon === 'shotgun') { range = 60; damage = 80; spread = 0.2; }
-       if (p.weapon === 'axe') { range = 250; damage = 50; spread = 1.5; }
-    }
-
-    // Hit Logic
-    for (let id in players) {
-      if (id !== socket.id && players[id].active) {
-        const enemy = players[id];
-        const dist = Math.sqrt(Math.pow(enemy.x - p.x, 2) + Math.pow(enemy.y - p.y, 2));
+    // Check if anyone was hit
+    for (let enemyId in players) {
+      if (enemyId !== socket.id) {
+        const enemy = players[enemyId];
         
-        // Simple Angle Math
-        const angleToEnemy = Math.atan2(enemy.y - p.y, enemy.x - p.x);
-        let angleDiff = angleToEnemy - data.angle;
-        if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        // Simple Distance Check
+        const dx = attacker.x - enemy.x;
+        const dy = attacker.y - enemy.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < range && Math.abs(angleDiff) < spread) {
-          players[id].health -= damage;
-          io.emit("updateHealth", { id: id, health: players[id].health });
+        // If close enough (60 pixels), take damage
+        if (distance < 60) {
+          enemy.health -= 10;
+          io.emit("updateHealth", { id: enemyId, health: enemy.health });
 
-          if (players[id].health <= 0) {
-            p.score++;
+          // Check for Death
+          if (enemy.health <= 0) {
+            attacker.score += 1;
+            
             // Respawn Enemy
-            players[id].health = 100;
-            players[id].x = Math.floor(Math.random() * (MAP_WIDTH - 200)) + 100;
-            players[id].y = 0;
-            io.emit("scoreUpdate", { id: socket.id, score: p.score });
-            io.emit("respawn", players[id]);
+            enemy.health = 100;
+            enemy.x = Math.floor(Math.random() * 500);
+            enemy.y = 0;
+
+            // Notify everyone
+            io.emit("scoreUpdate", { id: socket.id, score: attacker.score });
+            io.emit("respawn", enemy);
           }
         }
       }
@@ -108,10 +85,11 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     delete players[socket.id];
-    io.emit("updatePlayers", players);
-    io.emit("playerCount", Object.keys(players).length);
+    io.emit("disconnectUser", socket.id);
   });
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`Server running on port ${port}`));
+server.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
