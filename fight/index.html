@@ -1,219 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Platform Fighter</title>
-    <style>
-        body { margin: 0; background: #222; overflow: hidden; font-family: sans-serif; }
-        canvas { display: block; }
-
-        /* MENU STYLES */
-        #menu {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; color: white; z-index: 10;
-        }
-        .btn {
-            background: #d00; color: white; border: none; padding: 20px 50px;
-            font-size: 24px; font-weight: bold; cursor: pointer; margin-top: 20px;
-        }
-        .btn:hover { background: #f00; }
-        
-        .cards { display: flex; gap: 20px; }
-        .card { 
-            border: 2px solid #555; padding: 20px; background: #111; 
-            width: 100px; text-align: center; cursor: pointer;
-        }
-        .card.selected { border-color: #0f0; background: #003300; }
-        
-        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: white; display: none; pointer-events: none;}
-    </style>
+<meta charset="utf-8">
+<title>Smash Clone</title>
+<style>
+body { margin:0; background:#111; overflow:hidden }
+canvas { display:block }
+</style>
 </head>
 <body>
+<canvas id="c"></canvas>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
+c.width = innerWidth;
+c.height = innerHeight;
 
-    <div id="menu">
-        <h1 style="color: #ff0055; font-size: 60px; margin-bottom: 10px;">SMASH ARENA</h1>
-        <p id="connectionStatus" style="color: yellow;">Connecting to Server...</p>
+const socket = io("https://8o2lymxge7.onrender.com");
 
-        <h3>SELECT WEAPON</h3>
-        <div class="cards">
-            <div class="card selected" onclick="selectWep('rifle', this)">🔫<br>Rifle</div>
-            <div class="card" onclick="selectWep('shotgun', this)">💥<br>Shotgun</div>
-            <div class="card" onclick="selectWep('axe', this)">🪓<br>Axe</div>
-        </div>
+let players = {};
+let me = null;
 
-        <button id="playBtn" class="btn" onclick="join()" disabled>WAITING...</button>
-    </div>
+const gravity = 0.8;
+const speed = 5;
+const jump = -14;
+const platforms = [{x:0,y:600,w:2000,h:40}];
+const keys = {};
 
-    <div id="ui">
-        <h2>WASD = Move | CLICK = Attack</h2>
-        <h2 id="score">Kills: 0</h2>
-    </div>
+onkeydown = e => keys[e.key] = true;
+onkeyup = e => keys[e.key] = false;
+onmousedown = () => socket.emit("attack");
 
-    <canvas id="gameCanvas"></canvas>
+socket.on("connect", () => me = socket.id);
+socket.on("state", s => players = s);
+socket.on("playerMove", p => players[p.id] = p);
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+function update() {
+  if (!players[me]) return;
+  const p = players[me];
 
-        // --- CONNECT ---
-        const socket = io('https://8o2lymxge7.onrender.com');
+  if (keys.a) { p.vx = -speed; p.facing = -1; }
+  else if (keys.d) { p.vx = speed; p.facing = 1; }
+  else p.vx *= 0.8;
 
-        let myId = null;
-        let players = {};
-        let myWeapon = 'rifle';
-        let isPlaying = false;
+  if (keys.w && p.y > 550) p.vy = jump;
 
-        // --- MENU LOGIC ---
-        socket.on('connect', () => {
-            myId = socket.id;
-            document.getElementById('connectionStatus').innerText = "SERVER ONLINE";
-            document.getElementById('connectionStatus').style.color = "#0f0";
-            document.getElementById('playBtn').disabled = false;
-            document.getElementById('playBtn').innerText = "FIGHT!";
-        });
+  if (keys["1"]) socket.emit("weapon","sword");
+  if (keys["2"]) socket.emit("weapon","blaster");
 
-        function selectWep(w, el) {
-            myWeapon = w;
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-            el.classList.add('selected');
-        }
+  p.vy += gravity;
+  p.x += p.vx;
+  p.y += p.vy;
 
-        function join() {
-            // THIS IS THE CRITICAL PART
-            socket.emit('joinGame', { weapon: myWeapon });
-            
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('ui').style.display = 'block';
-            isPlaying = true;
-            
-            // Set initial physics pos
-            myPos.x = 100; myPos.y = 0;
-        }
+  if (p.y > 560) { p.y = 560; p.vy = 0; }
 
-        // --- PHYSICS (FROM YOUR CODE) ---
-        const GRAVITY = 0.8;
-        const SPEED = 6;
-        const platforms = [
-            { x: 100, y: 500, w: 200, h: 20 },
-            { x: 500, y: 500, w: 200, h: 20 },
-            { x: 300, y: 350, w: 200, h: 20 },
-            { x: 0, y: window.innerHeight - 50, w: window.innerWidth, h: 50 }
-        ];
+  socket.emit("move", {
+    x:p.x, y:p.y, vx:p.vx, vy:p.vy, facing:p.facing
+  });
+}
 
-        let myPos = { x: 100, y: 0, vx: 0, vy: 0, grounded: false, facing: 1 };
-        const keys = { a: false, d: false, w: false };
+function draw() {
+  update();
+  ctx.clearRect(0,0,c.width,c.height);
 
-        window.onkeydown = (e) => keys[e.key] = true;
-        window.onkeyup = (e) => keys[e.key] = false;
-        window.onmousedown = () => { if(isPlaying) socket.emit('attack'); };
+  ctx.fillStyle="#555";
+  platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
 
-        function updatePhysics() {
-            if(!isPlaying) return;
+  for (let id in players) {
+    const p = players[id];
+    ctx.fillStyle = id===me?"#0f0":"#f00";
+    ctx.fillRect(p.x-20,p.y-20,40,40);
+    ctx.fillText(Math.floor(p.damage)+"%",p.x-15,p.y-30);
+  }
 
-            myPos.vx = 0;
-            if (keys['a']) { myPos.vx = -SPEED; myPos.facing = -1; }
-            if (keys['d']) { myPos.vx = SPEED; myPos.facing = 1; }
-            if (keys['w'] && myPos.grounded) { myPos.vy = -15; myPos.grounded = false; }
-
-            myPos.vy += GRAVITY;
-            myPos.x += myPos.vx;
-            myPos.y += myPos.vy;
-            myPos.grounded = false;
-
-            for (let p of platforms) {
-                if (myPos.vy >= 0 &&
-                    myPos.x + 20 > p.x && myPos.x - 20 < p.x + p.w &&
-                    myPos.y + 20 > p.y && myPos.y + 20 < p.y + p.h + 10
-                ) {
-                    myPos.y = p.y - 20;
-                    myPos.vy = 0;
-                    myPos.grounded = true;
-                }
-            }
-
-            if(myId) socket.emit('playerMovement', { x: myPos.x, y: myPos.y, facing: myPos.facing });
-        }
-
-        // --- DRAWING ---
-        let fx = []; // Attack effects
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Platforms
-            ctx.fillStyle = "#666";
-            for(let p of platforms) ctx.fillRect(p.x, p.y, p.w, p.h);
-
-            updatePhysics();
-
-            // Players
-            for(let id in players) {
-                let p = players[id];
-                let x = (id === myId) ? myPos.x : p.x;
-                let y = (id === myId) ? myPos.y : p.y;
-                let f = (id === myId) ? myPos.facing : p.facing;
-                let w = (id === myId) ? myWeapon : p.weapon;
-
-                // Body
-                ctx.fillStyle = p.color || 'white';
-                ctx.fillRect(x-20, y-20, 40, 40);
-
-                // Eyes
-                ctx.fillStyle = "white";
-                if(f === 1) ctx.fillRect(x+5, y-15, 10, 10);
-                else ctx.fillRect(x-15, y-15, 10, 10);
-
-                // Weapon Graphic
-                if(w === 'rifle') {
-                    ctx.fillStyle = "#ccc";
-                    if(f===1) ctx.fillRect(x+10, y-5, 30, 8);
-                    else ctx.fillRect(x-40, y-5, 30, 8);
-                } else if(w === 'shotgun') {
-                    ctx.fillStyle = "#555";
-                    if(f===1) ctx.fillRect(x+10, y-5, 20, 14);
-                    else ctx.fillRect(x-30, y-5, 20, 14);
-                } else { // Axe
-                    ctx.fillStyle = "#8b4513";
-                    if(f===1) { ctx.fillRect(x+15, y-15, 6, 30); ctx.fillStyle="silver"; ctx.fillRect(x+15,y-15,20,10); }
-                    else { ctx.fillRect(x-21, y-15, 6, 30); ctx.fillStyle="silver"; ctx.fillRect(x-35,y-15,20,10); }
-                }
-
-                // HP Bar
-                ctx.fillStyle = "red"; ctx.fillRect(x-20, y-35, 40, 5);
-                ctx.fillStyle = "#0f0"; ctx.fillRect(x-20, y-35, 40*(p.health/100), 5);
-            }
-
-            // Draw FX
-            for(let f of fx) {
-                ctx.fillStyle = (f.weapon==='axe')?"white":"yellow";
-                let len = (f.weapon==='rifle')?400: (f.weapon==='shotgun'?150:60);
-                if(f.facing === 1) ctx.fillRect(f.x+20, f.y-5, len, 5);
-                else ctx.fillRect(f.x-20-len, f.y-5, len, 5);
-                f.life--;
-            }
-            fx = fx.filter(f => f.life > 0);
-
-            requestAnimationFrame(draw);
-        }
-
-        // --- NETWORK ---
-        socket.on('updatePlayers', (p) => {
-            players = p;
-            if(players[myId]) document.getElementById('score').innerText = "Kills: " + players[myId].score;
-        });
-        socket.on('playerMoved', (p) => { if(players[p.id]) Object.assign(players[p.id], p); });
-        socket.on('attackAnim', (d) => {
-            if(players[d.id]) {
-                let x = (d.id === myId) ? myPos.x : players[d.id].x;
-                let y = (d.id === myId) ? myPos.y : players[d.id].y;
-                fx.push({x:x, y:y, weapon:d.weapon, facing:d.facing, life:5});
-            }
-        });
-
-        draw();
-    </script>
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
 </body>
 </html>
