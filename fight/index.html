@@ -1,54 +1,52 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>1v1 Platformer Fight</title>
+    <title>Platform Fighter</title>
     <style>
-        body { margin: 0; background: #222; overflow: hidden; font-family: 'Courier New', sans-serif; }
+        body { margin: 0; background: #222; overflow: hidden; font-family: sans-serif; }
         canvas { display: block; }
-        
-        /* THE MENU OVERLAY */
+
+        /* MENU STYLES */
         #menu {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); color: white;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            z-index: 10;
+            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white; z-index: 10;
         }
         .btn {
-            background: #ff0055; color: white; padding: 20px 40px; 
-            font-size: 24px; border: none; cursor: pointer; margin-top: 20px;
-            font-family: inherit; font-weight: bold;
+            background: #d00; color: white; border: none; padding: 20px 50px;
+            font-size: 24px; font-weight: bold; cursor: pointer; margin-top: 20px;
         }
-        .btn:hover { background: #ff4488; }
+        .btn:hover { background: #f00; }
         
-        /* CARDS */
         .cards { display: flex; gap: 20px; }
-        .card { border: 2px solid #555; padding: 20px; text-align: center; cursor: pointer; background: #111; }
-        .card.selected { border-color: #0f0; background: #002200; }
-
-        /* IN-GAME UI */
-        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: white; pointer-events: none;}
+        .card { 
+            border: 2px solid #555; padding: 20px; background: #111; 
+            width: 100px; text-align: center; cursor: pointer;
+        }
+        .card.selected { border-color: #0f0; background: #003300; }
+        
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: white; display: none; pointer-events: none;}
     </style>
 </head>
 <body>
 
     <div id="menu">
-        <h1 style="font-size: 50px; color: #ff0055;">PLATFORM ARENA</h1>
-        <p>Status: <span id="status" style="color:orange">Connecting...</span></p>
-        
-        <h3>CHOOSE LOADOUT</h3>
+        <h1 style="color: #ff0055; font-size: 60px; margin-bottom: 10px;">SMASH ARENA</h1>
+        <p id="connectionStatus" style="color: yellow;">Connecting to Server...</p>
+
+        <h3>SELECT WEAPON</h3>
         <div class="cards">
-            <div class="card selected" onclick="pick('rifle', this)">🔫 RIFLE</div>
-            <div class="card" onclick="pick('shotgun', this)">💥 SHOTGUN</div>
-            <div class="card" onclick="pick('axe', this)">🪓 AXE</div>
+            <div class="card selected" onclick="selectWep('rifle', this)">🔫<br>Rifle</div>
+            <div class="card" onclick="selectWep('shotgun', this)">💥<br>Shotgun</div>
+            <div class="card" onclick="selectWep('axe', this)">🪓<br>Axe</div>
         </div>
 
-        <button class="btn" onclick="startGame()">PLAY GAME</button>
+        <button id="playBtn" class="btn" onclick="join()" disabled>WAITING...</button>
     </div>
 
     <div id="ui">
-        <h2>WASD to Move | CLICK to Shoot | 1-2-3 Switch Weapon</h2>
-        <h2 id="scoreDisplay">Kills: 0</h2>
+        <h2>WASD = Move | CLICK = Attack</h2>
+        <h2 id="score">Kills: 0</h2>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -60,16 +58,43 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // --- 1. CONNECT TO SERVER ---
+        // --- CONNECT ---
         const socket = io('https://8o2lymxge7.onrender.com');
 
-        let players = {};
         let myId = null;
+        let players = {};
         let myWeapon = 'rifle';
+        let isPlaying = false;
 
-        // --- 2. PHYSICS ---
+        // --- MENU LOGIC ---
+        socket.on('connect', () => {
+            myId = socket.id;
+            document.getElementById('connectionStatus').innerText = "SERVER ONLINE";
+            document.getElementById('connectionStatus').style.color = "#0f0";
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('playBtn').innerText = "FIGHT!";
+        });
+
+        function selectWep(w, el) {
+            myWeapon = w;
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function join() {
+            // THIS IS THE CRITICAL PART
+            socket.emit('joinGame', { weapon: myWeapon });
+            
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('ui').style.display = 'block';
+            isPlaying = true;
+            
+            // Set initial physics pos
+            myPos.x = 100; myPos.y = 0;
+        }
+
+        // --- PHYSICS (FROM YOUR CODE) ---
         const GRAVITY = 0.8;
-        const JUMP_FORCE = -15;
         const SPEED = 6;
         const platforms = [
             { x: 100, y: 500, w: 200, h: 20 },
@@ -78,176 +103,117 @@
             { x: 0, y: window.innerHeight - 50, w: window.innerWidth, h: 50 }
         ];
 
-        // Local Player State
         let myPos = { x: 100, y: 0, vx: 0, vy: 0, grounded: false, facing: 1 };
-        const keys = { a: false, d: false };
+        const keys = { a: false, d: false, w: false };
 
-        // --- 3. INPUTS ---
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'a') keys.a = true;
-            if (e.key === 'd') keys.d = true;
-            if (e.key === ' ') {
-                if (myPos.grounded) { myPos.vy = JUMP_FORCE; myPos.grounded = false; }
-            }
-            // Weapon Switch Keys
-            if (e.key === '1') { myWeapon='rifle'; socket.emit('switchWeapon', 'rifle'); }
-            if (e.key === '2') { myWeapon='shotgun'; socket.emit('switchWeapon', 'shotgun'); }
-            if (e.key === '3') { myWeapon='axe'; socket.emit('switchWeapon', 'axe'); }
-        });
-        window.addEventListener('keyup', (e) => {
-            if (e.key === 'a') keys.a = false;
-            if (e.key === 'd') keys.d = false;
-        });
-        window.addEventListener('mousedown', () => {
-            socket.emit('attack');
-        });
+        window.onkeydown = (e) => keys[e.key] = true;
+        window.onkeyup = (e) => keys[e.key] = false;
+        window.onmousedown = () => { if(isPlaying) socket.emit('attack'); };
 
-        // --- MENU LOGIC ---
-        function pick(w, el) {
-            myWeapon = w;
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-            el.classList.add('selected');
-        }
-        function startGame() {
-            document.getElementById('menu').style.display = 'none';
-            socket.emit('switchWeapon', myWeapon);
-        }
-
-        // --- 4. GAME LOOP ---
         function updatePhysics() {
+            if(!isPlaying) return;
+
             myPos.vx = 0;
-            if (keys.a) { myPos.vx = -SPEED; myPos.facing = -1; }
-            if (keys.d) { myPos.vx = SPEED; myPos.facing = 1; }
+            if (keys['a']) { myPos.vx = -SPEED; myPos.facing = -1; }
+            if (keys['d']) { myPos.vx = SPEED; myPos.facing = 1; }
+            if (keys['w'] && myPos.grounded) { myPos.vy = -15; myPos.grounded = false; }
 
             myPos.vy += GRAVITY;
             myPos.x += myPos.vx;
             myPos.y += myPos.vy;
             myPos.grounded = false;
 
-            // Platform Collision
-            for (let plat of platforms) {
+            for (let p of platforms) {
                 if (myPos.vy >= 0 &&
-                    myPos.x + 20 > plat.x && myPos.x - 20 < plat.x + plat.w &&
-                    myPos.y + 20 > plat.y && myPos.y + 20 < plat.y + plat.h + 10
+                    myPos.x + 20 > p.x && myPos.x - 20 < p.x + p.w &&
+                    myPos.y + 20 > p.y && myPos.y + 20 < p.y + p.h + 10
                 ) {
-                    myPos.y = plat.y - 20;
+                    myPos.y = p.y - 20;
                     myPos.vy = 0;
                     myPos.grounded = true;
                 }
             }
-            
-            // Send position to server
-            if (myId) {
-                socket.emit('playerMovement', { 
-                    x: myPos.x, y: myPos.y, facing: myPos.facing 
-                });
-            }
+
+            if(myId) socket.emit('playerMovement', { x: myPos.x, y: myPos.y, facing: myPos.facing });
         }
 
-        let attackAnimations = []; 
+        // --- DRAWING ---
+        let fx = []; // Attack effects
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw Platforms
+
+            // Platforms
             ctx.fillStyle = "#666";
-            for (let p of platforms) ctx.fillRect(p.x, p.y, p.w, p.h);
+            for(let p of platforms) ctx.fillRect(p.x, p.y, p.w, p.h);
 
             updatePhysics();
 
-            // Draw Players
-            for (let id in players) {
-                const p = players[id];
-                let drawX = (id === myId) ? myPos.x : p.x;
-                let drawY = (id === myId) ? myPos.y : p.y;
-                let facing = (id === myId) ? myPos.facing : (p.facing || 1);
-                let weapon = (id === myId) ? myWeapon : (p.weapon || 'rifle');
+            // Players
+            for(let id in players) {
+                let p = players[id];
+                let x = (id === myId) ? myPos.x : p.x;
+                let y = (id === myId) ? myPos.y : p.y;
+                let f = (id === myId) ? myPos.facing : p.facing;
+                let w = (id === myId) ? myWeapon : p.weapon;
 
                 // Body
-                ctx.fillStyle = p.color;
-                ctx.fillRect(drawX - 20, drawY - 20, 40, 40);
+                ctx.fillStyle = p.color || 'white';
+                ctx.fillRect(x-20, y-20, 40, 40);
 
-                // Eyes (Direction)
+                // Eyes
                 ctx.fillStyle = "white";
-                if (facing === 1) ctx.fillRect(drawX + 5, drawY - 15, 10, 10);
-                else ctx.fillRect(drawX - 15, drawY - 15, 10, 10);
+                if(f === 1) ctx.fillRect(x+5, y-15, 10, 10);
+                else ctx.fillRect(x-15, y-15, 10, 10);
 
-                // WEAPON DRAWING
-                ctx.fillStyle = "#ccc";
-                if(weapon === 'rifle') {
-                    if(facing===1) ctx.fillRect(drawX+10, drawY-5, 30, 8);
-                    else ctx.fillRect(drawX-40, drawY-5, 30, 8);
-                }
-                else if(weapon === 'shotgun') {
+                // Weapon Graphic
+                if(w === 'rifle') {
+                    ctx.fillStyle = "#ccc";
+                    if(f===1) ctx.fillRect(x+10, y-5, 30, 8);
+                    else ctx.fillRect(x-40, y-5, 30, 8);
+                } else if(w === 'shotgun') {
                     ctx.fillStyle = "#555";
-                    if(facing===1) ctx.fillRect(drawX+10, drawY-5, 20, 12);
-                    else ctx.fillRect(drawX-30, drawY-5, 20, 12);
-                }
-                else if(weapon === 'axe') {
+                    if(f===1) ctx.fillRect(x+10, y-5, 20, 14);
+                    else ctx.fillRect(x-30, y-5, 20, 14);
+                } else { // Axe
                     ctx.fillStyle = "#8b4513";
-                    if(facing===1) { ctx.fillRect(drawX+15, drawY-10, 8, 30); ctx.fillStyle="silver"; ctx.fillRect(drawX+15, drawY-10, 20, 10); }
-                    else { ctx.fillRect(drawX-23, drawY-10, 8, 30); ctx.fillStyle="silver"; ctx.fillRect(drawX-35, drawY-10, 20, 10); }
+                    if(f===1) { ctx.fillRect(x+15, y-15, 6, 30); ctx.fillStyle="silver"; ctx.fillRect(x+15,y-15,20,10); }
+                    else { ctx.fillRect(x-21, y-15, 6, 30); ctx.fillStyle="silver"; ctx.fillRect(x-35,y-15,20,10); }
                 }
 
-                // Health Bar
-                ctx.fillStyle = "red";
-                ctx.fillRect(drawX - 20, drawY - 35, 40, 5);
-                ctx.fillStyle = "#0f0";
-                ctx.fillRect(drawX - 20, drawY - 35, 40 * (p.health / 100), 5);
+                // HP Bar
+                ctx.fillStyle = "red"; ctx.fillRect(x-20, y-35, 40, 5);
+                ctx.fillStyle = "#0f0"; ctx.fillRect(x-20, y-35, 40*(p.health/100), 5);
             }
 
-            // Draw Attacks (Flashes)
-            for (let i = 0; i < attackAnimations.length; i++) {
-                const anim = attackAnimations[i];
-                if (players[anim.id]) {
-                    const p = players[anim.id];
-                    let x = (anim.id === myId) ? myPos.x : p.x;
-                    let y = (anim.id === myId) ? myPos.y : p.y;
-                    let dir = (anim.id === myId) ? myPos.facing : p.facing;
-
-                    // Muzzle Flash
-                    ctx.fillStyle = (anim.weapon === 'axe') ? "rgba(255,255,255,0.5)" : "yellow";
-                    let wLen = (anim.weapon === 'rifle') ? 400 : (anim.weapon==='shotgun' ? 150 : 60);
-                    let wH = (anim.weapon === 'shotgun') ? 40 : 5;
-                    
-                    if(dir === 1) ctx.fillRect(x + 20, y - 5, wLen, wH);
-                    else ctx.fillRect(x - 20 - wLen, y - 5, wLen, wH);
-                }
-                anim.life--;
+            // Draw FX
+            for(let f of fx) {
+                ctx.fillStyle = (f.weapon==='axe')?"white":"yellow";
+                let len = (f.weapon==='rifle')?400: (f.weapon==='shotgun'?150:60);
+                if(f.facing === 1) ctx.fillRect(f.x+20, f.y-5, len, 5);
+                else ctx.fillRect(f.x-20-len, f.y-5, len, 5);
+                f.life--;
             }
-            attackAnimations = attackAnimations.filter(a => a.life > 0);
+            fx = fx.filter(f => f.life > 0);
 
             requestAnimationFrame(draw);
         }
 
-        // --- 5. SOCKET EVENTS ---
-        socket.on('connect', () => {
-            myId = socket.id;
-            document.getElementById('status').innerText = "ONLINE";
-            document.getElementById('status').style.color = "#0f0";
+        // --- NETWORK ---
+        socket.on('updatePlayers', (p) => {
+            players = p;
+            if(players[myId]) document.getElementById('score').innerText = "Kills: " + players[myId].score;
         });
-
-        // We use updatePlayers because it is more robust
-        socket.on('updatePlayers', (serverPlayers) => {
-            players = serverPlayers;
-            if(myId && players[myId]) {
-                document.getElementById('scoreDisplay').innerText = "Kills: " + players[myId].score;
+        socket.on('playerMoved', (p) => { if(players[p.id]) Object.assign(players[p.id], p); });
+        socket.on('attackAnim', (d) => {
+            if(players[d.id]) {
+                let x = (d.id === myId) ? myPos.x : players[d.id].x;
+                let y = (d.id === myId) ? myPos.y : players[d.id].y;
+                fx.push({x:x, y:y, weapon:d.weapon, facing:d.facing, life:5});
             }
         });
-        
-        socket.on('playerMoved', (p) => {
-            if (players[p.id]) {
-                players[p.id].x = p.x;
-                players[p.id].y = p.y;
-                players[p.id].facing = p.facing;
-            }
-        });
-        
-        socket.on('playerAttack', (data) => {
-            attackAnimations.push({ id: data.id, weapon: data.weapon, life: 5 }); 
-        });
 
-        requestAnimationFrame(draw);
+        draw();
     </script>
 </body>
 </html>
