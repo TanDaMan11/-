@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>1v1 Platformer Fight</title>
+    <style>
+        body { margin: 0; background: #222; overflow: hidden; font-family: 'Courier New', sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: white; pointer-events: none;}
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h2>WASD to Move | SPACE to Jump | CLICK to Attack</h2>
+        <div id="scores"></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // --- 1. CONNECT TO SERVER ---
+        // REPLACE THIS WITH YOUR RENDER URL!
+        const socket = io('https://8o2lymxge7.onrender.com');
+
+        let players = {};
+        
+        // --- 2. PHYSICS ---
+        const GRAVITY = 0.8;
+        const JUMP_FORCE = -15;
+        const SPEED = 6;
+        const platforms = [
+            { x: 100, y: 500, w: 200, h: 20 },
+            { x: 500, y: 500, w: 200, h: 20 },
+            { x: 300, y: 350, w: 200, h: 20 },
+            { x: 0, y: window.innerHeight - 50, w: window.innerWidth, h: 50 }
+        ];
+
+        // Local Player State
+        let myPos = { x: 100, y: 0, vx: 0, vy: 0, grounded: false, facing: 1 };
+        const keys = { a: false, d: false };
+
+        // --- 3. INPUTS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'a') keys.a = true;
+            if (e.key === 'd') keys.d = true;
+            if (e.key === ' ') {
+                if (myPos.grounded) { myPos.vy = JUMP_FORCE; myPos.grounded = false; }
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'a') keys.a = false;
+            if (e.key === 'd') keys.d = false;
+        });
+        window.addEventListener('mousedown', () => {
+            // Tell server we want to attack
+            socket.emit('attack');
+        });
+
+        // --- 4. GAME LOOP ---
+        function updatePhysics() {
+            myPos.vx = 0;
+            if (keys.a) { myPos.vx = -SPEED; myPos.facing = -1; }
+            if (keys.d) { myPos.vx = SPEED; myPos.facing = 1; }
+
+            myPos.vy += GRAVITY;
+            myPos.x += myPos.vx;
+            myPos.y += myPos.vy;
+            myPos.grounded = false;
+
+            // Platform Collision
+            for (let plat of platforms) {
+                if (myPos.vy >= 0 &&
+                    myPos.x + 20 > plat.x && myPos.x - 20 < plat.x + plat.w &&
+                    myPos.y + 20 > plat.y && myPos.y + 20 < plat.y + plat.h + 10
+                ) {
+                    myPos.y = plat.y - 20;
+                    myPos.vy = 0;
+                    myPos.grounded = true;
+                }
+            }
+            
+            // Send position to server
+            if (players[socket.id]) {
+                socket.emit('playerMovement', { 
+                    x: myPos.x, y: myPos.y, direction: myPos.facing 
+                });
+            }
+        }
+
+        let attackAnimations = []; // Store active attack effects
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Platforms
+            ctx.fillStyle = "#666";
+            for (let p of platforms) ctx.fillRect(p.x, p.y, p.w, p.h);
+
+            updatePhysics();
+
+            // Draw Players
+            for (let id in players) {
+                const p = players[id];
+                let drawX = (id === socket.id) ? myPos.x : p.x;
+                let drawY = (id === socket.id) ? myPos.y : p.y;
+                let facing = (id === socket.id) ? myPos.facing : (p.direction || 1);
+
+                // Body
+                ctx.fillStyle = p.color;
+                ctx.fillRect(drawX - 20, drawY - 20, 40, 40);
+
+                // Eyes (Direction)
+                ctx.fillStyle = "white";
+                if (facing === 1) ctx.fillRect(drawX + 5, drawY - 15, 10, 10);
+                else ctx.fillRect(drawX - 15, drawY - 15, 10, 10);
+
+                // Health Bar
+                ctx.fillStyle = "red";
+                ctx.fillRect(drawX - 20, drawY - 35, 40, 5);
+                ctx.fillStyle = "#0f0";
+                ctx.fillRect(drawX - 20, drawY - 35, 40 * (p.health / 100), 5);
+            }
+
+            // Draw Attacks (White Flash)
+            for (let i = 0; i < attackAnimations.length; i++) {
+                const anim = attackAnimations[i];
+                if (players[anim.id]) {
+                    const p = players[anim.id];
+                    let x = (anim.id === socket.id) ? myPos.x : p.x;
+                    let y = (anim.id === socket.id) ? myPos.y : p.y;
+                    let dir = (anim.id === socket.id) ? myPos.facing : p.direction;
+
+                    ctx.fillStyle = "white";
+                    // Draw a "sword" box in front of player
+                    ctx.fillRect(x + (dir * 25), y - 10, 30, 20); 
+                }
+                anim.life--;
+            }
+            // Remove old animations
+            attackAnimations = attackAnimations.filter(a => a.life > 0);
+
+            requestAnimationFrame(draw);
+        }
+
+        // --- 5. SOCKET EVENTS ---
+        socket.on('currentPlayers', (serverPlayers) => {
+            players = serverPlayers;
+            requestAnimationFrame(draw);
+        });
+        socket.on('newPlayer', (p) => players[p.id] = p);
+        socket.on('playerMoved', (p) => {
+            if (players[p.id]) {
+                players[p.id].x = p.x;
+                players[p.id].y = p.y;
+                players[p.id].direction = p.direction;
+            }
+        });
+        socket.on('playerAttack', (id) => {
+            attackAnimations.push({ id: id, life: 10 }); // Show for 10 frames
+        });
+        socket.on('updateHealth', (data) => {
+            if (players[data.id]) players[data.id].health = data.health;
+        });
+        socket.on('respawn', (p) => {
+            if (players[p.id]) {
+                players[p.id].health = 100;
+                players[p.id].x = p.x;
+                players[p.id].y = p.y;
+                if(p.id === socket.id) { myPos.x = p.x; myPos.y = p.y; }
+            }
+        });
+        socket.on('scoreUpdate', (data) => {
+            if (players[data.id]) players[data.id].score = data.score;
+        });
+        socket.on('disconnectUser', (id) => delete players[id]);
+
+    </script>
+</body>
+</html>
