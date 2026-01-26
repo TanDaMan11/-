@@ -1,103 +1,84 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-const http = require('http');
+const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 
-// Allow CORS so your client can connect from anywhere (Localhost or Render)
-const io = new Server(server, {
-    cors: { origin: "*" }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
-// Serve static files if you are hosting the HTML in the same project
-app.use(express.static(__dirname));
-
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
-
-// GAME STATE
 let players = {};
 
-io.on('connection', (socket) => {
-    console.log('⚡ New Player Connected:', socket.id);
+io.on("connection", (socket) => {
+  console.log("User connected to lobby:", socket.id);
 
-    // --- INSTANT SPAWN LOGIC ---
-    // We create the player object immediately. No "Join" button required.
+  // 1. Send current players to the new person so they can see the game happening
+  socket.emit("updatePlayers", players);
+
+  // 2. WAIT FOR JOIN (This is the fix)
+  socket.on("joinGame", () => {
+    console.log("Player joining:", socket.id);
     players[socket.id] = {
-        id: socket.id,
-        x: Math.random() * 800, // Random spawn X
-        y: 100,
-        color: `hsl(${Math.random() * 360}, 100%, 50%)`, // Random color
-        health: 100,
-        facing: 1, // 1 = Right, -1 = Left
-        score: 0
+      id: socket.id,
+      x: Math.random() * 400 + 100,
+      y: 100,
+      color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
+      health: 100,
+      score: 0,
+      facing: 1
     };
+    // Tell everyone a new player has actually joined
+    io.emit("updatePlayers", players);
+  });
 
-    // Send this new player to everyone, and send everyone to this new player
-    io.emit('updatePlayers', players);
+  // 3. MOVEMENT
+  socket.on("playerMovement", (data) => {
+    // Only move if the player actually exists (has joined)
+    if (players[socket.id]) {
+      players[socket.id].x = data.x;
+      players[socket.id].y = data.y;
+      players[socket.id].facing = data.facing;
+      socket.broadcast.emit("playerMoved", players[socket.id]);
+    }
+  });
 
-    // 1. MOVEMENT LISTENERS
-    socket.on('move', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
-            players[socket.id].facing = data.facing;
-            // Broadcast the movement to everyone else (updates their screens)
-            socket.broadcast.emit('playerMoved', players[socket.id]);
-        }
-    });
+  // 4. ATTACK
+  socket.on("attack", () => {
+    const p = players[socket.id];
+    if (!p) return;
 
-    // 2. COMBAT LISTENERS
-    socket.on('attack', () => {
-        const attacker = players[socket.id];
-        if (!attacker) return;
+    io.emit("attackAnim", { id: socket.id, facing: p.facing });
 
-        // Visual: Tell everyone this player attacked
-        io.emit('attackAnim', { id: socket.id });
-
-        // Logic: Check hitboxes on Server (prevent cheating)
-        // Hitbox: 100px range in front of player
-        for (let enemyId in players) {
-            if (enemyId !== socket.id) {
-                const enemy = players[enemyId];
+    // Simple Hit Logic
+    for (let id in players) {
+      if (id !== socket.id) {
+        let enemy = players[id];
+        let dx = enemy.x - p.x;
+        let dy = Math.abs(enemy.y - p.y);
+        
+        // Range check (100px range, must be mostly on same level)
+        if (dy < 60) {
+            if ((p.facing === 1 && dx > 0 && dx < 100) || 
+                (p.facing === -1 && dx < 0 && dx > -100)) {
                 
-                // Calculate Distance
-                const dx = enemy.x - attacker.x;
-                const dy = enemy.y - attacker.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-
-                // Check if enemy is in front and close
-                const isInFront = (attacker.facing === 1 && dx > 0) || (attacker.facing === -1 && dx < 0);
-                
-                if (dist < 100 && isInFront) {
-                    enemy.health -= 10;
-                    
-                    // Respawn if dead
-                    if (enemy.health <= 0) {
-                        attacker.score += 1;
-                        enemy.health = 100;
-                        enemy.x = Math.random() * 800;
-                        enemy.y = 0;
-                    }
-                    
-                    // Sync health changes to everyone
-                    io.emit('updatePlayers', players);
+                enemy.health -= 10;
+                if (enemy.health <= 0) {
+                    enemy.health = 100;
+                    enemy.x = Math.random() * 500;
+                    enemy.y = 0;
+                    p.score++;
                 }
+                io.emit("updatePlayers", players);
             }
         }
-    });
+      }
+    }
+  });
 
-    // 3. DISCONNECT
-    socket.on('disconnect', () => {
-        console.log('User Disconnected:', socket.id);
-        delete players[socket.id];
-        io.emit('updatePlayers', players);
-    });
+  socket.on("disconnect", () => {
+    delete players[socket.id];
+    io.emit("updatePlayers", players);
+  });
 });
 
-// Use Render's PORT or 3000 for local
 const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+server.listen(port, () => console.log(`Server running on port ${port}`));
