@@ -4,79 +4,77 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 
-const io = new Server(server);
+const io = new Server(server, { cors: { origin: "*" } });
 
-// --- THIS WAS MISSING. IT IS REQUIRED TO LOAD THE GAME. ---
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
-// ----------------------------------------------------------
+// Serve the file if you go to the render URL directly (optional but good)
+app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 
 let players = {};
 
 io.on("connection", (socket) => {
-  console.log("A user connected: " + socket.id);
+  console.log("Connected: " + socket.id);
 
-  // 1. CREATE PLAYER IMMEDIATELY (Instant Spawn)
-  players[socket.id] = {
-    id: socket.id,
-    x: Math.random() * 400 + 100, // Random X spawn
-    y: 100,
-    color: "hsl(" + Math.random() * 360 + ", 100%, 50%)",
-    health: 100,
-    score: 0,
-    facing: 1
-  };
+  // 1. Send update to the new user so they see the count
+  socket.emit("updatePlayers", players);
 
-  // 2. Send the player list to everyone
-  io.emit("updatePlayers", players);
+  // 2. JOIN GAME (Waits for name)
+  socket.on("joinGame", (data) => {
+    players[socket.id] = {
+      id: socket.id,
+      x: Math.random() * 400 + 100,
+      y: 100,
+      color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+      health: 100,
+      score: 0,
+      facing: 1,
+      name: data.name || "Player" // Store the name
+    };
+    io.emit("updatePlayers", players);
+  });
 
-  // 3. Movement Listener
+  // 3. MOVEMENT
   socket.on("playerMovement", (data) => {
     if (players[socket.id]) {
       players[socket.id].x = data.x;
       players[socket.id].y = data.y;
       players[socket.id].facing = data.facing;
-      // Tell everyone else this player moved
       socket.broadcast.emit("playerMoved", players[socket.id]);
     }
   });
 
-  // 4. Attack Listener
+  // 4. ATTACK (Longer Range)
   socket.on("attack", () => {
     const p = players[socket.id];
     if (!p) return;
 
     io.emit("attackAnim", { id: socket.id, facing: p.facing });
 
-    // Hit Detection
     for (let id in players) {
       if (id !== socket.id) {
         let enemy = players[id];
-        let dist = enemy.x - p.x;
-        let yDist = Math.abs(enemy.y - p.y);
-
-        // Simple Range Check (Attack range 100px)
-        if (yDist < 60) { // Must be on same vertical level
-             if ((p.facing === 1 && dist > 0 && dist < 100) || 
-                 (p.facing === -1 && dist < 0 && dist > -100)) {
-                 
-                 enemy.health -= 10;
-                 if (enemy.health <= 0) {
-                     enemy.health = 100;
-                     enemy.x = Math.random() * 500;
-                     enemy.y = 0;
-                     p.score++;
-                 }
-                 io.emit("updatePlayers", players);
-             }
+        let dx = enemy.x - p.x;
+        let dy = Math.abs(enemy.y - p.y);
+        
+        // RANGE INCREASED TO 150 (Was 100)
+        if (dy < 60) {
+            if ((p.facing === 1 && dx > 0 && dx < 150) || 
+                (p.facing === -1 && dx < 0 && dx > -150)) {
+                
+                enemy.health -= 10;
+                if (enemy.health <= 0) {
+                    enemy.health = 100;
+                    enemy.x = Math.random() * 500;
+                    enemy.y = 0;
+                    p.score++;
+                }
+                io.emit("updatePlayers", players);
+            }
         }
       }
     }
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected: " + socket.id);
     delete players[socket.id];
     io.emit("updatePlayers", players);
   });
