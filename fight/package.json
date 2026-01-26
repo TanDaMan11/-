@@ -1,0 +1,13 @@
+{
+  "name": "platformer-fight",
+  "version": "1.0.0",
+  "description": "1v1 Fight Game",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
