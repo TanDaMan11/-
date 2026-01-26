@@ -1,82 +1,174 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Smash Clone</title>
-<style>
-body { margin:0; background:#111; overflow:hidden }
-canvas { display:block }
-</style>
+    <meta charset="UTF-8">
+    <title>2D Battle Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; font-size: 18px; }
+    </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script>
-const c = document.getElementById("c");
-const ctx = c.getContext("2d");
-c.width = innerWidth;
-c.height = innerHeight;
 
-const socket = io("https://8o2lymxge7.onrender.com");
+    <div id="ui">Controls: WASD to Move | SPACE to Jump | CLICK to Attack</div>
+    <canvas id="gameCanvas"></canvas>
 
-let players = {};
-let me = null;
+    <script src="/socket.io/socket.io.js"></script> 
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Resize canvas to full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-const gravity = 0.8;
-const speed = 5;
-const jump = -14;
-const platforms = [{x:0,y:600,w:2000,h:40}];
-const keys = {};
+        // --- CONNECTION ---
+        // If hosting on Render with Node, use io()
+        // If opening index.html locally, use io('https://your-app-name.onrender.com')
+        const socket = io(); 
 
-onkeydown = e => keys[e.key] = true;
-onkeyup = e => keys[e.key] = false;
-onmousedown = () => socket.emit("attack");
+        // --- GAME VARIABLES ---
+        let players = {};
+        let myId = null;
 
-socket.on("connect", () => me = socket.id);
-socket.on("state", s => players = s);
-socket.on("playerMove", p => players[p.id] = p);
+        // Physics Config
+        const GRAVITY = 0.8;
+        const JUMP_FORCE = -15;
+        const SPEED = 5;
+        const GROUND_Y = canvas.height - 50; // Floor level
 
-function update() {
-  if (!players[me]) return;
-  const p = players[me];
+        // My Player Local State (Client-Side Prediction)
+        let me = { x: 400, y: 100, vx: 0, vy: 0, facing: 1, grounded: false };
 
-  if (keys.a) { p.vx = -speed; p.facing = -1; }
-  else if (keys.d) { p.vx = speed; p.facing = 1; }
-  else p.vx *= 0.8;
+        // Input State
+        const keys = { w:false, a:false, s:false, d:false, " ":false };
 
-  if (keys.w && p.y > 550) p.vy = jump;
+        // --- INPUT LISTENERS ---
+        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+        window.addEventListener('mousedown', () => socket.emit('attack'));
 
-  if (keys["1"]) socket.emit("weapon","sword");
-  if (keys["2"]) socket.emit("weapon","blaster");
+        // --- SOCKET EVENTS ---
+        
+        // 1. Initial Connection
+        socket.on('connect', () => {
+            myId = socket.id;
+            console.log("Connected with ID:", myId);
+        });
 
-  p.vy += gravity;
-  p.x += p.vx;
-  p.y += p.vy;
+        // 2. Update All Players (Health, Score, New Joins)
+        socket.on('updatePlayers', (serverPlayers) => {
+            players = serverPlayers;
+            // If the server tells me I moved (reconciliation), usually we'd sync here.
+            // For simplicity, we trust the server's health/score but keep our own X/Y for smoothness.
+        });
 
-  if (p.y > 560) { p.y = 560; p.vy = 0; }
+        // 3. Receive Movement from Others
+        socket.on('playerMoved', (data) => {
+            if(players[data.id]) {
+                players[data.id].x = data.x;
+                players[data.id].y = data.y;
+                players[data.id].facing = data.facing;
+            }
+        });
 
-  socket.emit("move", {
-    x:p.x, y:p.y, vx:p.vx, vy:p.vy, facing:p.facing
-  });
-}
+        // 4. Attack Animation
+        socket.on('attackAnim', (data) => {
+            if(players[data.id]) {
+                // Quick flash effect
+                players[data.id].isAttacking = true;
+                setTimeout(() => { 
+                    if(players[data.id]) players[data.id].isAttacking = false; 
+                }, 100);
+            }
+        });
 
-function draw() {
-  update();
-  ctx.clearRect(0,0,c.width,c.height);
+        // --- GAME LOOP ---
+        function update() {
+            // 1. Physics (Gravity)
+            me.vy += GRAVITY;
+            me.y += me.vy;
 
-  ctx.fillStyle="#555";
-  platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
+            // 2. Horizontal Movement
+            if (keys['a']) { me.x -= SPEED; me.facing = -1; }
+            if (keys['d']) { me.x += SPEED; me.facing = 1; }
 
-  for (let id in players) {
-    const p = players[id];
-    ctx.fillStyle = id===me?"#0f0":"#f00";
-    ctx.fillRect(p.x-20,p.y-20,40,40);
-    ctx.fillText(Math.floor(p.damage)+"%",p.x-15,p.y-30);
-  }
+            // 3. Floor Collision
+            if (me.y >= GROUND_Y - 50) { // 50 is player height
+                me.y = GROUND_Y - 50;
+                me.vy = 0;
+                me.grounded = true;
+            } else {
+                me.grounded = false;
+            }
 
-  requestAnimationFrame(draw);
-}
-draw();
-</script>
+            // 4. Jumping
+            if (keys[' '] && me.grounded) {
+                me.vy = JUMP_FORCE;
+            }
+
+            // 5. Send Data to Server
+            // We only send data if we are connected and have an ID
+            if (myId) {
+                socket.emit('move', { x: me.x, y: me.y, facing: me.facing });
+                
+                // Update my position in the local 'players' list immediately for rendering
+                if(players[myId]) {
+                    players[myId].x = me.x;
+                    players[myId].y = me.y;
+                    players[myId].facing = me.facing;
+                }
+            }
+        }
+
+        function draw() {
+            // Clear Screen
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Floor
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, GROUND_Y, canvas.width, 50);
+
+            // Draw Players
+            for (let id in players) {
+                const p = players[id];
+                
+                // Body
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 50, 50);
+
+                // Eyes (to show facing direction)
+                ctx.fillStyle = 'white';
+                const eyeOffset = p.facing === 1 ? 30 : 5;
+                ctx.fillRect(p.x + eyeOffset, p.y + 10, 15, 15);
+
+                // Health Bar
+                ctx.fillStyle = 'red';
+                ctx.fillRect(p.x, p.y - 15, 50, 5);
+                ctx.fillStyle = '#0f0';
+                ctx.fillRect(p.x, p.y - 15, 50 * (p.health / 100), 5);
+
+                // Score
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.fillText(`Score: ${p.score}`, p.x, p.y - 25);
+
+                // Attack Flash
+                if (p.isAttacking) {
+                    ctx.fillStyle = 'yellow';
+                    const atkX = p.facing === 1 ? p.x + 50 : p.x - 50;
+                    ctx.fillRect(atkX, p.y + 20, 50, 10);
+                }
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        // Start Loop
+        setInterval(update, 1000 / 60); // 60 FPS Physics
+        draw(); // Rendering loop
+    </script>
 </body>
 </html>
