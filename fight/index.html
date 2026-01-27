@@ -1,201 +1,174 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Battle Game</title>
+    <title>Arena Fighter</title>
     <style>
-        body { margin: 0; background: #222; overflow: hidden; font-family: monospace; }
-        canvas { display: block; }
+        body { background: #1a1a1a; margin: 0; overflow: hidden; font-family: 'Arial', sans-serif; color: white; }
+        canvas { display: block; margin: 0 auto; background: #2a2a2a; border: 2px solid #444; }
         
         /* UI OVERLAY */
-        #uiLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        
-        .hud { 
-            color: white; font-size: 20px; font-weight: bold; 
-            text-shadow: 2px 2px 0 #000; padding: 20px;
-            display: flex; justify-content: space-between;
-        }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; }
+        .stat { font-size: 20px; font-weight: bold; margin: 0 15px; text-shadow: 2px 2px 0 #000; }
 
-        /* START SCREEN */
-        #startScreen {
+        /* LOGIN SCREEN */
+        #login {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9);
             display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            pointer-events: auto; z-index: 10;
+            justify-content: center; align-items: center;
+            z-index: 10;
         }
-        
-        input { padding: 10px; font-size: 20px; text-align: center; margin-bottom: 10px; }
+        input { padding: 10px; font-size: 20px; text-align: center; margin-bottom: 20px; }
         button { 
             padding: 15px 40px; font-size: 24px; font-weight: bold; 
-            cursor: pointer; background: #0f0; border: none; 
+            background: #e91e63; color: white; border: none; cursor: pointer; 
         }
-        button:hover { background: #5f5; }
-
+        button:hover { background: #ff4081; }
     </style>
 </head>
 <body>
 
-    <div id="startScreen">
-        <h1 style="color:white; font-size: 50px;">BATTLE ARENA</h1>
+    <div id="login">
+        <h1 style="font-size: 50px; color: #e91e63;">ARENA BRAWL</h1>
         <input type="text" id="username" placeholder="Enter Name" maxlength="10">
-        <button onclick="joinGame()">JOIN GAME</button>
-        <p id="status" style="color:yellow; margin-top:20px;">Connecting to server...</p>
+        <button onclick="startGame()">FIGHT!</button>
     </div>
 
-    <div id="uiLayer">
-        <div class="hud">
-            <span id="scoreText">Kills: 0</span>
-            <span id="onlineText">Online: 0</span>
-        </div>
+    <div id="ui">
+        <span id="score">Kills: 0</span>
+        <span id="online">Online: 0</span>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="game" width="800" height="600"></canvas>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const canvas = document.getElementById('gameCanvas');
+        // --- 1. SETUP ---
+        const socket = io(); // Connects automatically to Render
+        const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        
+        // Responsive Canvas
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
 
-        // --- REPLACE THIS WITH YOUR RENDER URL ---
-        const socket = io('https://8o2lymxge7.onrender.com');
-
+        let me = { x: 0, y: 0 };
         let players = {};
         let myId = null;
         let isPlaying = false;
-        let myName = "";
+        
+        // --- 2. INPUTS ---
+        const keys = {};
+        window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+        window.onmousedown = () => { if(isPlaying) socket.emit('attack'); };
 
-        // --- JOIN LOGIC ---
-        socket.on('connect', () => {
-            document.getElementById('status').innerText = "SERVER ONLINE - READY";
-            document.getElementById('status').style.color = "#0f0";
-        });
-
-        function joinGame() {
-            const input = document.getElementById('username');
-            if(input.value.trim() === "") { alert("Enter a name!"); return; }
-            
-            myName = input.value;
-            socket.emit('joinGame', { name: myName });
-            
-            document.getElementById('startScreen').style.display = 'none';
+        // --- 3. START GAME ---
+        function startGame() {
+            const name = document.getElementById('username').value || "Fighter";
+            socket.emit('join', name);
+            document.getElementById('login').style.display = 'none';
             isPlaying = true;
         }
 
-        // --- PHYSICS ---
-        const GRAVITY = 0.8;
-        const platforms = [
-            { x: 100, y: 500, w: 200, h: 20 },
-            { x: 500, y: 500, w: 200, h: 20 },
-            { x: 300, y: 350, w: 200, h: 20 },
-            { x: 0, y: window.innerHeight - 50, w: window.innerWidth, h: 50 }
-        ];
+        // --- 4. GAME LOOP ---
+        function update() {
+            if(!isPlaying || !players[myId]) return;
 
-        let myPos = { x: 100, y: 0, vx: 0, vy: 0, grounded: false, facing: 1 };
-        const keys = {};
+            // Movement Logic (No Gravity!)
+            let speed = 5;
+            let moved = false;
+            
+            // Get current position from server data first
+            let p = players[myId]; 
+            
+            if (keys['w']) { p.y -= speed; moved = true; }
+            if (keys['s']) { p.y += speed; moved = true; }
+            if (keys['a']) { p.x -= speed; moved = true; }
+            if (keys['d']) { p.x += speed; moved = true; }
 
-        window.onkeydown = e => keys[e.key] = true;
-        window.onkeyup = e => keys[e.key] = false;
-        window.onmousedown = () => { if(isPlaying) socket.emit('attack'); };
-
-        function updatePhysics() {
-            if(!isPlaying) return;
-
-            myPos.vx = 0;
-            if (keys['a']) { myPos.vx = -6; myPos.facing = -1; }
-            if (keys['d']) { myPos.vx = 6; myPos.facing = 1; }
-            if (keys['w'] && myPos.grounded) { myPos.vy = -15; myPos.grounded = false; }
-
-            myPos.vy += GRAVITY;
-            myPos.x += myPos.vx;
-            myPos.y += myPos.vy;
-            myPos.grounded = false;
-
-            for (let p of platforms) {
-                if (myPos.vy >= 0 &&
-                    myPos.x + 20 > p.x && myPos.x - 20 < p.x + p.w &&
-                    myPos.y + 20 > p.y && myPos.y + 20 < p.y + p.h + 10
-                ) {
-                    myPos.y = p.y - 20;
-                    myPos.vy = 0;
-                    myPos.grounded = true;
-                }
-            }
-            if(myId) socket.emit('playerMovement', { x: myPos.x, y: myPos.y, facing: myPos.facing });
+            // Send to server
+            if (moved) socket.emit('move', { x: p.x, y: p.y });
         }
 
-        // --- DRAWING ---
-        let attacks = [];
+        let effects = []; // For attack animations
 
         function draw() {
-            ctx.fillStyle = "#222";
+            update();
+
+            // Clear Screen
+            ctx.fillStyle = "#2a2a2a";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Platforms
-            ctx.fillStyle = "#666";
-            for(let p of platforms) ctx.fillRect(p.x, p.y, p.w, p.h);
+            // Draw Grid (Optional, makes it look cool)
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 2;
+            for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+            for(let i=0; i<canvas.height; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
 
-            updatePhysics();
-
-            // Players
-            for(let id in players) {
+            // Draw Players
+            for (let id in players) {
                 let p = players[id];
-                let isMe = (id === myId);
-                let x = (isMe && isPlaying) ? myPos.x : p.x;
-                let y = (isMe && isPlaying) ? myPos.y : p.y;
-                let f = (isMe && isPlaying) ? myPos.facing : p.facing;
+                
+                // Draw Body (Circle)
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 2;
+                ctx.stroke();
 
-                // Body
-                ctx.fillStyle = p.color || 'white';
-                ctx.fillRect(x-20, y-20, 40, 40);
-
-                // Eyes
+                // Draw Name
                 ctx.fillStyle = "white";
-                if(f === 1) ctx.fillRect(x+5, y-15, 10, 10);
-                else ctx.fillRect(x-15, y-15, 10, 10);
-
-                // NAME TAG (New!)
-                ctx.fillStyle = "white"; 
-                ctx.font = "bold 14px monospace";
+                ctx.font = "bold 14px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText(p.name || "Player", x, y - 45);
+                ctx.fillText(p.name, p.x, p.y - 30);
 
-                // HP Bar
-                ctx.fillStyle = "red"; ctx.fillRect(x-20, y-35, 40, 5);
-                ctx.fillStyle = "#0f0"; ctx.fillRect(x-20, y-35, 40*(p.health/100), 5);
+                // Draw Health Bar
+                ctx.fillStyle = "red";
+                ctx.fillRect(p.x - 20, p.y - 40, 40, 5);
+                ctx.fillStyle = "#0f0";
+                ctx.fillRect(p.x - 20, p.y - 40, 40 * (p.hp / 100), 5);
             }
 
-            // Attacks
-            ctx.fillStyle = "yellow";
-            for(let a of attacks) {
-                if(a.facing === 1) ctx.fillRect(a.x+20, a.y-5, 150, 10); // Longer Range Graphic
-                else ctx.fillRect(a.x-170, a.y-5, 150, 10);
-                a.life--;
+            // Draw Attack Effects (Expanding rings)
+            ctx.lineWidth = 4;
+            for(let i=0; i<effects.length; i++) {
+                let e = effects[i];
+                ctx.strokeStyle = `rgba(255, 255, 255, ${e.life / 10})`;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, 60 - (e.life * 2), 0, Math.PI * 2); // Expanding ring
+                ctx.stroke();
+                e.life--;
             }
-            attacks = attacks.filter(a => a.life > 0);
+            effects = effects.filter(e => e.life > 0);
 
             requestAnimationFrame(draw);
         }
 
-        // --- SOCKETS ---
-        socket.on('connect', () => { myId = socket.id; });
+        // --- 5. SERVER EVENTS ---
+        socket.on('connect', () => myId = socket.id);
         
-        socket.on('updatePlayers', (p) => {
-            players = p;
-            document.getElementById('onlineText').innerText = "Online: " + Object.keys(players).length;
-            if(players[myId]) document.getElementById('scoreText').innerText = "Kills: " + players[myId].score;
+        socket.on('update', (serverPlayers) => {
+            players = serverPlayers;
+            document.getElementById('online').innerText = "Online: " + Object.keys(players).length;
+            if(players[myId]) document.getElementById('score').innerText = "Kills: " + players[myId].score;
         });
 
-        socket.on('playerMoved', (p) => { if(players[p.id]) Object.assign(players[p.id], p); });
-        
-        socket.on('attackAnim', (data) => {
+        socket.on('playerMoved', (data) => {
             if(players[data.id]) {
-                let x = (data.id === myId && isPlaying) ? myPos.x : players[data.id].x;
-                let y = (data.id === myId && isPlaying) ? myPos.y : players[data.id].y;
-                attacks.push({ x: x, y: y, facing: data.facing, life: 5 });
+                players[data.id].x = data.x;
+                players[data.id].y = data.y;
             }
+        });
+
+        socket.on('attackVisual', (data) => {
+            effects.push({ x: data.x, y: data.y, life: 10 });
         });
 
         draw();
