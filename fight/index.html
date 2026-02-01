@@ -1,177 +1,268 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Arena Fighter</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Fighting Game</title>
     <style>
-        body { background: #1a1a1a; margin: 0; overflow: hidden; font-family: 'Arial', sans-serif; color: white; }
-        canvas { display: block; margin: 0 auto; background: #2a2a2a; border: 2px solid #444; }
-        
-        /* UI OVERLAY */
-        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; }
-        .stat { font-size: 20px; font-weight: bold; margin: 0 15px; text-shadow: 2px 2px 0 #000; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        /* LOGIN SCREEN */
-        #login {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            z-index: 10;
+        body {
+            background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
         }
-        input { padding: 10px; font-size: 20px; text-align: center; margin-bottom: 20px; }
-        button { 
-            padding: 15px 40px; font-size: 24px; font-weight: bold; 
-            background: #e91e63; color: white; border: none; cursor: pointer; 
+
+        #gameContainer {
+            position: relative;
         }
-        button:hover { background: #ff4081; }
+
+        #gameCanvas {
+            border: 3px solid #0f3460;
+            box-shadow: 0 0 30px rgba(15, 52, 96, 0.5);
+            background: linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 50%, #8b7355 50%, #654321 100%);
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            color: white;
+            pointer-events: none;
+        }
+
+        .health-bar {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #0f3460;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: inline-block;
+            min-width: 200px;
+        }
+
+        .health-fill {
+            height: 20px;
+            background: linear-gradient(to right, #ff0000, #ff6b6b);
+            border-radius: 5px;
+            transition: width 0.3s;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+
+        .player-name {
+            font-size: 14px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            pointer-events: all;
+            border: 3px solid #0f3460;
+        }
+
+        #menu h1 {
+            color: #e94560;
+            margin-bottom: 20px;
+            font-size: 36px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #menu input {
+            padding: 10px;
+            margin: 10px 0;
+            width: 250px;
+            border: 2px solid #0f3460;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+        }
+
+        #menu button {
+            padding: 12px 30px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+
+        #menu button:hover {
+            background: #d63447;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            border: 2px solid #0f3460;
+        }
+
+        #weaponSelector {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #0f3460;
+            display: none;
+            pointer-events: all;
+        }
+
+        .weapon-button {
+            background: #0f3460;
+            color: white;
+            border: 2px solid #e94560;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .weapon-button:hover {
+            background: #e94560;
+            transform: scale(1.05);
+        }
+
+        .weapon-button.active {
+            background: #e94560;
+            box-shadow: 0 0 15px rgba(233, 69, 96, 0.8);
+        }
+
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px 50px;
+            border-radius: 15px;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            border: 3px solid #e94560;
+            display: none;
+            pointer-events: all;
+        }
+
+        #scoreboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #0f3460;
+            color: white;
+            min-width: 150px;
+        }
+
+        .score-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #e94560;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .score-item {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        #lobbyInfo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #0f3460;
+            color: white;
+            font-size: 14px;
+        }
+
+        .lobby-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #4a90e2;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui">
+            <div id="healthBars"></div>
+        </div>
 
-    <div id="login">
-        <h1 style="font-size: 50px; color: #e91e63;">ARENA BRAWL</h1>
-        <input type="text" id="username" placeholder="Enter Name" maxlength="10">
-        <button onclick="startGame()">FIGHT!</button>
+        <div id="lobbyInfo">
+            <div class="lobby-title">🎮 MAIN LOBBY</div>
+            <div>Players: <span id="playerCount">0</span></div>
+        </div>
+
+        <div id="scoreboard">
+            <div class="score-title">🏆 KILLS</div>
+            <div id="scoreList"></div>
+        </div>
+
+        <div id="menu">
+            <h1>⚔️ FIGHT! ⚔️</h1>
+            <p style="color: #fff; margin-bottom: 20px;">Join the main lobby and battle!</p>
+            <input type="text" id="playerName" placeholder="Enter your name" maxlength="15" />
+            <br>
+            <button id="joinButton">JOIN LOBBY</button>
+        </div>
+
+        <div id="weaponSelector">
+            <div style="color: white; margin-bottom: 10px; font-weight: bold;">Choose Weapon (1-4):</div>
+            <button class="weapon-button active" data-weapon="0">⚔️ Sword (DMG: 15)</button>
+            <button class="weapon-button" data-weapon="1">🪓 Axe (DMG: 25)</button>
+            <button class="weapon-button" data-weapon="2">🔱 Spear (DMG: 12)</button>
+            <button class="weapon-button" data-weapon="3">🔨 Hammer (DMG: 30)</button>
+        </div>
+
+        <div id="controls">
+            Controls: ← → Move | ↑ Jump | SPACE Attack | 1-4 Switch Weapon
+        </div>
+
+        <div id="message"></div>
     </div>
 
-    <div id="ui">
-        <span id="score">Kills: 0</span>
-        <span id="online">Online: 0</span>
-    </div>
-
-    <canvas id="game" width="800" height="600"></canvas>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        // --- 1. SETUP ---
-        const socket = io(); // Connects automatically to Render
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        
-        // Responsive Canvas
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        let me = { x: 0, y: 0 };
-        let players = {};
-        let myId = null;
-        let isPlaying = false;
-        
-        // --- 2. INPUTS ---
-        const keys = {};
-        window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
-        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
-        window.onmousedown = () => { if(isPlaying) socket.emit('attack'); };
-
-        // --- 3. START GAME ---
-        function startGame() {
-            const name = document.getElementById('username').value || "Fighter";
-            socket.emit('join', name);
-            document.getElementById('login').style.display = 'none';
-            isPlaying = true;
-        }
-
-        // --- 4. GAME LOOP ---
-        function update() {
-            if(!isPlaying || !players[myId]) return;
-
-            // Movement Logic (No Gravity!)
-            let speed = 5;
-            let moved = false;
-            
-            // Get current position from server data first
-            let p = players[myId]; 
-            
-            if (keys['w']) { p.y -= speed; moved = true; }
-            if (keys['s']) { p.y += speed; moved = true; }
-            if (keys['a']) { p.x -= speed; moved = true; }
-            if (keys['d']) { p.x += speed; moved = true; }
-
-            // Send to server
-            if (moved) socket.emit('move', { x: p.x, y: p.y });
-        }
-
-        let effects = []; // For attack animations
-
-        function draw() {
-            update();
-
-            // Clear Screen
-            ctx.fillStyle = "#2a2a2a";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Grid (Optional, makes it look cool)
-            ctx.strokeStyle = "#333";
-            ctx.lineWidth = 2;
-            for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
-            for(let i=0; i<canvas.height; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
-
-            // Draw Players
-            for (let id in players) {
-                let p = players[id];
-                
-                // Draw Body (Circle)
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
-                ctx.fillStyle = p.color;
-                ctx.fill();
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // Draw Name
-                ctx.fillStyle = "white";
-                ctx.font = "bold 14px Arial";
-                ctx.textAlign = "center";
-                ctx.fillText(p.name, p.x, p.y - 30);
-
-                // Draw Health Bar
-                ctx.fillStyle = "red";
-                ctx.fillRect(p.x - 20, p.y - 40, 40, 5);
-                ctx.fillStyle = "#0f0";
-                ctx.fillRect(p.x - 20, p.y - 40, 40 * (p.hp / 100), 5);
-            }
-
-            // Draw Attack Effects (Expanding rings)
-            ctx.lineWidth = 4;
-            for(let i=0; i<effects.length; i++) {
-                let e = effects[i];
-                ctx.strokeStyle = `rgba(255, 255, 255, ${e.life / 10})`;
-                ctx.beginPath();
-                ctx.arc(e.x, e.y, 60 - (e.life * 2), 0, Math.PI * 2); // Expanding ring
-                ctx.stroke();
-                e.life--;
-            }
-            effects = effects.filter(e => e.life > 0);
-
-            requestAnimationFrame(draw);
-        }
-
-        // --- 5. SERVER EVENTS ---
-        socket.on('connect', () => myId = socket.id);
-        
-        socket.on('update', (serverPlayers) => {
-            players = serverPlayers;
-            document.getElementById('online').innerText = "Online: " + Object.keys(players).length;
-            if(players[myId]) document.getElementById('score').innerText = "Kills: " + players[myId].score;
-        });
-
-        socket.on('playerMoved', (data) => {
-            if(players[data.id]) {
-                players[data.id].x = data.x;
-                players[data.id].y = data.y;
-            }
-        });
-
-        socket.on('attackVisual', (data) => {
-            effects.push({ x: data.x, y: data.y, life: 10 });
-        });
-
-        draw();
-    </script>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script src="index.js"></script>
 </body>
 </html>
