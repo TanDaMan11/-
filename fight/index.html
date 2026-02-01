@@ -1,268 +1,239 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Fighting Game</title>
+    <title>Neon Brawler</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        body { margin: 0; overflow: hidden; background: #111; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; }
+        
+        #ui { position: absolute; top: 20px; left: 20px; color: white; pointer-events: none; }
+        .bar { width: 200px; height: 10px; background: #333; margin-top: 5px; border: 1px solid #555; }
+        .fill { height: 100%; background: #0f0; width: 100%; transition: width 0.2s; }
+        
+        #leaderboard { position: absolute; top: 20px; right: 20px; text-align: right; color: white; pointer-events: none; }
 
-        body {
-            background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 100%);
-            font-family: 'Arial', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            overflow: hidden;
+        #login { 
+            position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95);
+            display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:99;
         }
-
-        #gameContainer {
-            position: relative;
-        }
-
-        #gameCanvas {
-            border: 3px solid #0f3460;
-            box-shadow: 0 0 30px rgba(15, 52, 96, 0.5);
-            background: linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 50%, #8b7355 50%, #654321 100%);
-        }
-
-        #ui {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 20px;
-            color: white;
-            pointer-events: none;
-        }
-
-        .health-bar {
-            background: rgba(0, 0, 0, 0.7);
-            border: 2px solid #0f3460;
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 10px;
-            display: inline-block;
-            min-width: 200px;
-        }
-
-        .health-fill {
-            height: 20px;
-            background: linear-gradient(to right, #ff0000, #ff6b6b);
-            border-radius: 5px;
-            transition: width 0.3s;
-            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
-        }
-
-        .player-name {
-            font-size: 14px;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        #menu {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 40px;
-            border-radius: 15px;
-            text-align: center;
-            pointer-events: all;
-            border: 3px solid #0f3460;
-        }
-
-        #menu h1 {
-            color: #e94560;
-            margin-bottom: 20px;
-            font-size: 36px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        #menu input {
-            padding: 10px;
-            margin: 10px 0;
-            width: 250px;
-            border: 2px solid #0f3460;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.9);
-            font-size: 16px;
-        }
-
-        #menu button {
-            padding: 12px 30px;
-            background: #e94560;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
-            margin-top: 10px;
-            transition: background 0.3s;
-        }
-
-        #menu button:hover {
-            background: #d63447;
-        }
-
-        #controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 10px;
-            color: white;
-            font-size: 14px;
-            border: 2px solid #0f3460;
-        }
-
-        #weaponSelector {
-            position: absolute;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid #0f3460;
-            display: none;
-            pointer-events: all;
-        }
-
-        .weapon-button {
-            background: #0f3460;
-            color: white;
-            border: 2px solid #e94560;
-            padding: 10px 15px;
-            margin: 5px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        .weapon-button:hover {
-            background: #e94560;
-            transform: scale(1.05);
-        }
-
-        .weapon-button.active {
-            background: #e94560;
-            box-shadow: 0 0 15px rgba(233, 69, 96, 0.8);
-        }
-
-        #message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 30px 50px;
-            border-radius: 15px;
-            color: white;
-            font-size: 32px;
-            font-weight: bold;
-            border: 3px solid #e94560;
-            display: none;
-            pointer-events: all;
-        }
-
-        #scoreboard {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid #0f3460;
-            color: white;
-            min-width: 150px;
-        }
-
-        .score-title {
-            font-size: 16px;
-            font-weight: bold;
-            color: #e94560;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-
-        .score-item {
-            font-size: 14px;
-            margin: 5px 0;
-        }
-
-        #lobbyInfo {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid #0f3460;
-            color: white;
-            font-size: 14px;
-        }
-
-        .lobby-title {
-            font-size: 16px;
-            font-weight: bold;
-            color: #4a90e2;
-            margin-bottom: 5px;
-        }
+        input { padding: 15px; font-size: 20px; background: #222; color: white; border: 2px solid #555; text-align: center; }
+        button { margin-top: 20px; padding: 15px 40px; font-size: 24px; background: #0f0; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #5f5; box-shadow: 0 0 20px #0f0; }
     </style>
 </head>
 <body>
-    <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        
-        <div id="ui">
-            <div id="healthBars"></div>
-        </div>
 
-        <div id="lobbyInfo">
-            <div class="lobby-title">🎮 MAIN LOBBY</div>
-            <div>Players: <span id="playerCount">0</span></div>
-        </div>
-
-        <div id="scoreboard">
-            <div class="score-title">🏆 KILLS</div>
-            <div id="scoreList"></div>
-        </div>
-
-        <div id="menu">
-            <h1>⚔️ FIGHT! ⚔️</h1>
-            <p style="color: #fff; margin-bottom: 20px;">Join the main lobby and battle!</p>
-            <input type="text" id="playerName" placeholder="Enter your name" maxlength="15" />
-            <br>
-            <button id="joinButton">JOIN LOBBY</button>
-        </div>
-
-        <div id="weaponSelector">
-            <div style="color: white; margin-bottom: 10px; font-weight: bold;">Choose Weapon (1-4):</div>
-            <button class="weapon-button active" data-weapon="0">⚔️ Sword (DMG: 15)</button>
-            <button class="weapon-button" data-weapon="1">🪓 Axe (DMG: 25)</button>
-            <button class="weapon-button" data-weapon="2">🔱 Spear (DMG: 12)</button>
-            <button class="weapon-button" data-weapon="3">🔨 Hammer (DMG: 30)</button>
-        </div>
-
-        <div id="controls">
-            Controls: ← → Move | ↑ Jump | SPACE Attack | 1-4 Switch Weapon
-        </div>
-
-        <div id="message"></div>
+    <div id="login">
+        <h1 style="color: #0f0; font-size: 60px; text-shadow: 0 0 20px #0f0;">NEON BRAWL</h1>
+        <input type="text" id="username" placeholder="NICKNAME" maxlength="10">
+        <button onclick="join()">ENTER ARENA</button>
+        <p id="status" style="color:#666; margin-top:10px;">Waiting for server...</p>
     </div>
 
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    <script src="index.js"></script>
+    <div id="ui">
+        <h2 id="myScore">Kills: 0</h2>
+        <div class="bar"><div id="hpBar" class="fill"></div></div>
+        <p style="font-size: 12px; color: #aaa;">WASD to Move | SPACE to Dash | CLICK to Attack</p>
+    </div>
+
+    <div id="leaderboard">
+        <h3>LEADERBOARD</h3>
+        <div id="lbContent"></div>
+    </div>
+
+    <canvas id="game"></canvas>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        
+        // --- GAME STATE ---
+        let me = { id: null, x: 0, y: 0 };
+        let players = {};
+        let obstacles = [];
+        let particles = [];
+        let camera = { x: 0, y: 0 };
+        let isPlaying = false;
+        
+        // --- RESIZE ---
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize;
+        resize();
+
+        // --- CONTROLS ---
+        const keys = {};
+        window.onkeydown = e => {
+            keys[e.key.toLowerCase()] = true;
+            if(e.code === "Space" && isPlaying) dash();
+        };
+        window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+        window.onmousedown = () => { if(isPlaying) socket.emit('attack'); };
+
+        // --- JOIN ---
+        socket.on('connect', () => {
+            document.getElementById('status').innerText = "SERVER ONLINE";
+            document.getElementById('status').style.color = "#0f0";
+            me.id = socket.id;
+        });
+
+        function join() {
+            const name = document.getElementById('username').value;
+            socket.emit('join', name);
+            document.getElementById('login').style.display = 'none';
+            isPlaying = true;
+        }
+
+        // --- DASH MECHANIC ---
+        let isDashing = false;
+        let lastDash = 0;
+        function dash() {
+            const now = Date.now();
+            if(now - lastDash < 1000) return; // 1s Cooldown
+            lastDash = now;
+            isDashing = true;
+            setTimeout(() => isDashing = false, 200); // Dash lasts 0.2s
+        }
+
+        // --- GAME LOOP ---
+        function update() {
+            if(!isPlaying || !players[me.id]) return;
+
+            let p = players[me.id];
+            let speed = isDashing ? 12 : 5; // FAST if dashing
+            let move = false;
+
+            if(keys['w']) { p.y -= speed; move = true; }
+            if(keys['s']) { p.y += speed; move = true; }
+            if(keys['a']) { p.x -= speed; move = true; }
+            if(keys['d']) { p.x += speed; move = true; }
+
+            // Camera Follow
+            camera.x = p.x - canvas.width / 2;
+            camera.y = p.y - canvas.height / 2;
+
+            if(move) socket.emit('move', { x: p.x, y: p.y });
+        }
+
+        function draw() {
+            update();
+
+            // Background
+            ctx.fillStyle = "#111";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw Map Borders
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 5;
+            ctx.strokeRect(0, 0, 1000, 800);
+
+            // Draw Grid
+            ctx.strokeStyle = "#222";
+            ctx.lineWidth = 1;
+            for(let i=0; i<1000; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,800); ctx.stroke(); }
+            for(let i=0; i<800; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(1000,i); ctx.stroke(); }
+
+            // Draw Obstacles
+            ctx.fillStyle = "#444";
+            ctx.shadowBlur = 0;
+            for(let w of obstacles) {
+                ctx.fillRect(w.x, w.y, w.w, w.h);
+                // Bevel effect
+                ctx.strokeStyle = "#555";
+                ctx.strokeRect(w.x, w.y, w.w, w.h);
+            }
+
+            // Draw Players
+            for(let id in players) {
+                let p = players[id];
+                
+                // Shadow Glow
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 15;
+                
+                // Body
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 20, 0, Math.PI*2);
+                ctx.fill();
+
+                // Name
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = "white";
+                ctx.font = "bold 14px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(p.name, p.x, p.y - 30);
+                
+                // HP Bar
+                ctx.fillStyle = "red"; ctx.fillRect(p.x-20, p.y-45, 40, 5);
+                ctx.fillStyle = "#0f0"; ctx.fillRect(p.x-20, p.y-45, 40 * (p.hp/100), 5);
+            }
+
+            // Particles
+            for(let part of particles) {
+                ctx.fillStyle = part.c;
+                ctx.globalAlpha = part.life / 20;
+                ctx.beginPath();
+                ctx.arc(part.x, part.y, part.size, 0, Math.PI*2);
+                ctx.fill();
+                part.x += part.vx;
+                part.y += part.vy;
+                part.life--;
+            }
+            ctx.globalAlpha = 1;
+            particles = particles.filter(p => p.life > 0);
+
+            ctx.restore();
+            requestAnimationFrame(draw);
+        }
+
+        // --- EVENTS ---
+        socket.on('mapData', (data) => obstacles = data.obstacles);
+        
+        socket.on('update', (p) => {
+            players = p;
+            
+            // Update UI
+            if(players[me.id]) {
+                document.getElementById('myScore').innerText = "KILLS: " + players[me.id].score;
+                document.getElementById('hpBar').style.width = players[me.id].hp + "%";
+            }
+
+            // Update Leaderboard
+            let sorted = Object.values(players).sort((a,b) => b.score - a.score);
+            let lbHtml = "";
+            sorted.forEach(p => lbHtml += `<div>${p.name}: ${p.score}</div>`);
+            document.getElementById('lbContent').innerHTML = lbHtml;
+        });
+
+        socket.on('playerMoved', (p) => { if(players[p.id]) Object.assign(players[p.id], p); });
+
+        // Visual Effects
+        socket.on('attackAnim', (data) => {
+            // Create "Slash" effect
+            for(let i=0; i<5; i++) {
+                particles.push({ 
+                    x: data.x, y: data.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, 
+                    life: 10, size: 2, c: 'white' 
+                });
+            }
+        });
+
+        socket.on('hitAnim', (data) => {
+            // Create "Blood" effect
+            for(let i=0; i<10; i++) {
+                particles.push({ 
+                    x: data.x, y: data.y, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, 
+                    life: 30, size: 4, c: 'red' 
+                });
+            }
+        });
+
+        draw();
+    </script>
 </body>
 </html>
