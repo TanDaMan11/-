@@ -2,12 +2,26 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Server URL - connects to your Render deployment
+const SERVER_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : 'https://8o2lymxge7.onrender.com';
+
 // Game state
 let socket;
 let myId;
 let players = {};
 let keys = {};
 let myPlayer = null;
+let currentWeapon = 0;
+
+// Weapons
+const weapons = [
+  { name: 'Sword', damage: 15, range: 80, cooldown: 400, emoji: '⚔️' },
+  { name: 'Axe', damage: 25, range: 70, cooldown: 600, emoji: '🪓' },
+  { name: 'Spear', damage: 12, range: 120, cooldown: 350, emoji: '🔱' },
+  { name: 'Hammer', damage: 30, range: 60, cooldown: 800, emoji: '🔨' }
+];
 
 // Physics constants
 const GRAVITY = 0.8;
@@ -19,16 +33,25 @@ const GROUND_Y = 450;
 const menu = document.getElementById('menu');
 const joinButton = document.getElementById('joinButton');
 const playerNameInput = document.getElementById('playerName');
-const serverUrlInput = document.getElementById('serverUrl');
 const healthBarsContainer = document.getElementById('healthBars');
 const messageDiv = document.getElementById('message');
+const weaponSelector = document.getElementById('weaponSelector');
+const playerCountEl = document.getElementById('playerCount');
+const scoreListEl = document.getElementById('scoreList');
+
+// Weapon buttons
+const weaponButtons = document.querySelectorAll('.weapon-button');
+weaponButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const weaponIndex = parseInt(btn.dataset.weapon);
+        switchWeapon(weaponIndex);
+    });
+});
 
 // Join game
 joinButton.addEventListener('click', () => {
     const playerName = playerNameInput.value.trim() || 'Player';
-    const serverUrl = serverUrlInput.value.trim() || 'http://localhost:3000';
-    
-    connectToServer(serverUrl, playerName);
+    connectToServer(playerName);
 });
 
 // Allow enter key to join
@@ -38,31 +61,34 @@ playerNameInput.addEventListener('keypress', (e) => {
     }
 });
 
-serverUrlInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        joinButton.click();
-    }
-});
-
-function connectToServer(serverUrl, playerName) {
-    socket = io(serverUrl);
+function connectToServer(playerName) {
+    socket = io(SERVER_URL);
 
     socket.on('connect', () => {
         console.log('Connected to server');
         myId = socket.id;
         socket.emit('joinGame', { name: playerName });
         menu.style.display = 'none';
+        weaponSelector.style.display = 'block';
     });
 
     socket.on('currentPlayers', (serverPlayers) => {
         players = serverPlayers;
         myPlayer = players[myId];
+        if (myPlayer) {
+            currentWeapon = 0;
+            myPlayer.weapon = weapons[0];
+        }
         updateHealthBars();
+        updateScoreboard();
+        updatePlayerCount();
     });
 
     socket.on('newPlayer', (player) => {
         players[player.id] = player;
         updateHealthBars();
+        updateScoreboard();
+        updatePlayerCount();
     });
 
     socket.on('playerMoved', (data) => {
@@ -74,22 +100,29 @@ function connectToServer(serverUrl, playerName) {
         }
     });
 
+    socket.on('weaponSwitched', (data) => {
+        if (players[data.id]) {
+            players[data.id].weapon = data.weapon;
+        }
+    });
+
     socket.on('playerAttacked', (data) => {
         if (players[data.id]) {
             players[data.id].isAttacking = true;
+            players[data.id].weapon = data.weapon;
             
             setTimeout(() => {
                 if (players[data.id]) {
                     players[data.id].isAttacking = false;
                 }
-            }, 300);
+            }, data.weapon.cooldown);
 
             // Check if attack hit me
             if (myPlayer && data.id !== myId) {
                 const distance = Math.abs(myPlayer.x - data.x);
                 const verticalDistance = Math.abs(myPlayer.y - data.y);
                 
-                if (distance < 80 && verticalDistance < 100) {
+                if (distance < data.weapon.range && verticalDistance < 100) {
                     const attackerFacing = data.facing;
                     const imOnRight = myPlayer.x > data.x;
                     
@@ -110,12 +143,16 @@ function connectToServer(serverUrl, playerName) {
     });
 
     socket.on('playerDefeated', (data) => {
+        if (players[data.winnerId]) {
+            players[data.winnerId].kills = data.kills;
+        }
+
         if (data.winnerId === myId) {
-            showMessage('YOU WIN! 🏆');
+            showMessage('KILL! 🎯 Total: ' + data.kills);
         } else if (data.defeatedId === myId) {
-            showMessage('YOU LOSE! 💀');
+            showMessage('DEFEATED! 💀');
         } else {
-            showMessage(`${players[data.defeatedId]?.name || 'Player'} was defeated!`);
+            showMessage(`${data.killerName} eliminated ${players[data.defeatedId]?.name || 'player'}!`);
         }
 
         setTimeout(() => {
@@ -124,21 +161,62 @@ function connectToServer(serverUrl, playerName) {
                 players[data.defeatedId].x = Math.random() * 700 + 50;
                 players[data.defeatedId].y = GROUND_Y;
                 updateHealthBars();
+                updateScoreboard();
                 hideMessage();
             }
-        }, 3000);
+        }, 2000);
     });
 
     socket.on('playerDisconnected', (playerId) => {
         delete players[playerId];
         updateHealthBars();
+        updateScoreboard();
+        updatePlayerCount();
     });
 
     socket.on('disconnect', () => {
         console.log('Disconnected from server');
         showMessage('Disconnected from server');
         menu.style.display = 'block';
+        weaponSelector.style.display = 'none';
     });
+
+    socket.on('connect_error', (error) => {
+        console.error('Connection error:', error);
+        showMessage('Cannot connect to server. Check console.');
+    });
+}
+
+function switchWeapon(index) {
+    if (weapons[index] && myPlayer) {
+        currentWeapon = index;
+        myPlayer.weapon = weapons[index];
+        socket.emit('switchWeapon', index);
+        
+        // Update button states
+        weaponButtons.forEach((btn, i) => {
+            if (i === index) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+}
+
+function updatePlayerCount() {
+    const count = Object.keys(players).length;
+    playerCountEl.textContent = count;
+}
+
+function updateScoreboard() {
+    const sortedPlayers = Object.values(players)
+        .sort((a, b) => (b.kills || 0) - (a.kills || 0))
+        .slice(0, 5);
+    
+    scoreListEl.innerHTML = sortedPlayers
+        .map(p => `<div class="score-item">${p.name}: ${p.kills || 0}</div>`)
+        .join('');
 }
 
 function showMessage(text) {
@@ -160,9 +238,10 @@ function updateHealthBars() {
         healthBar.style.marginRight = '20px';
         
         const healthPercent = Math.max(0, player.health);
+        const weaponInfo = player.weapon ? ` ${player.weapon.emoji}` : '';
         
         healthBar.innerHTML = `
-            <div class="player-name">${player.name}${id === myId ? ' (You)' : ''}</div>
+            <div class="player-name">${player.name}${id === myId ? ' (You)' : ''}${weaponInfo}</div>
             <div style="width: 200px; background: rgba(255,255,255,0.2); border-radius: 5px; overflow: hidden;">
                 <div class="health-fill" style="width: ${healthPercent}%"></div>
             </div>
@@ -176,13 +255,20 @@ function updateHealthBars() {
 window.addEventListener('keydown', (e) => {
     keys[e.key] = true;
     
+    // Weapon switching with number keys
+    if (e.key >= '1' && e.key <= '4') {
+        e.preventDefault();
+        const weaponIndex = parseInt(e.key) - 1;
+        switchWeapon(weaponIndex);
+    }
+    
     if (e.key === ' ' && myPlayer) {
         e.preventDefault();
         socket.emit('playerAttack');
         myPlayer.isAttacking = true;
         setTimeout(() => {
             if (myPlayer) myPlayer.isAttacking = false;
-        }, 300);
+        }, myPlayer.weapon.cooldown);
     }
 });
 
@@ -297,30 +383,37 @@ function drawPlayer(player, isMe) {
         ctx.fillRect(x - 13, y - 80, 8, 8);
     }
 
-    // Arms
+    // Weapon and arms
     ctx.strokeStyle = isMe ? '#e94560' : '#4a90e2';
     ctx.lineWidth = 8;
     ctx.lineCap = 'round';
 
+    const weapon = player.weapon || weapons[0];
+
     if (player.isAttacking) {
-        // Attacking pose
+        // Attacking pose with weapon
         if (player.facing === 'right') {
             ctx.beginPath();
             ctx.moveTo(x + 20, y - 40);
-            ctx.lineTo(x + 50, y - 30);
+            ctx.lineTo(x + 50 + (weapon.range - 80) / 2, y - 30);
             ctx.stroke();
         } else {
             ctx.beginPath();
             ctx.moveTo(x - 20, y - 40);
-            ctx.lineTo(x - 50, y - 30);
+            ctx.lineTo(x - 50 - (weapon.range - 80) / 2, y - 30);
             ctx.stroke();
         }
         
+        // Weapon emoji
+        ctx.font = '30px Arial';
+        const weaponX = player.facing === 'right' ? x + 50 + (weapon.range - 80) / 2 : x - 50 - (weapon.range - 80) / 2;
+        ctx.fillText(weapon.emoji, weaponX - 15, y - 20);
+        
         // Attack effect
         ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
-        const punchX = player.facing === 'right' ? x + 50 : x - 50;
+        const effectX = player.facing === 'right' ? x + weapon.range : x - weapon.range;
         ctx.beginPath();
-        ctx.arc(punchX, y - 30, 15, 0, Math.PI * 2);
+        ctx.arc(effectX, y - 30, 20, 0, Math.PI * 2);
         ctx.fill();
     } else {
         // Normal arms
@@ -333,6 +426,11 @@ function drawPlayer(player, isMe) {
         ctx.moveTo(x + 20, y - 40);
         ctx.lineTo(x + 30, y - 20);
         ctx.stroke();
+        
+        // Show weapon in hand
+        ctx.font = '20px Arial';
+        const handX = player.facing === 'right' ? x + 30 : x - 30;
+        ctx.fillText(weapon.emoji, handX - 10, y - 15);
     }
 
     // Legs
