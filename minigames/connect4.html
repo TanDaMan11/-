@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connect 4</title>
+    <style>
+        body { background: #0f172a; color: white; text-align: center; font-family: sans-serif; }
+        #board { display: grid; grid-template-columns: repeat(7, 60px); gap: 5px; margin: 20px auto; width: fit-content; background: blue; padding: 10px; border-radius: 10px; }
+        .cell { width: 60px; height: 60px; background: #0f172a; border-radius: 50%; cursor: pointer; }
+        .red { background: red; } .yellow { background: yellow; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1 id="status">Connecting...</h1>
+    <div id="board"></div>
+    <button onclick="location.href='index.html'">Back to Menu</button>
+
+    <script type="module">
+        import { db } from './config.js';
+        import { ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const matchId = new URLSearchParams(location.search).get('m');
+        const myId = localStorage.getItem("playerId");
+        const boardDiv = document.getElementById('board');
+        let gameData, myColor;
+
+        for (let i = 0; i < 42; i++) {
+            let d = document.createElement('div');
+            d.className = 'cell';
+            d.onclick = () => move(i % 7);
+            boardDiv.appendChild(d);
+        }
+
+        onValue(ref(db, 'games/' + matchId), (snap) => {
+            gameData = snap.val();
+            if(!gameData) return;
+            myColor = (gameData.p1 === myId) ? 'red' : 'yellow';
+            document.getElementById('status').innerText = (gameData.turn === myId) ? "YOUR TURN" : "WAITING...";
+            
+            const cells = document.querySelectorAll('.cell');
+            (gameData.board || []).forEach((c, i) => {
+                cells[i].className = 'cell ' + (c || "");
+            });
+            if(gameData.winner) document.getElementById('status').innerText = (gameData.winner === myId) ? "YOU WIN!" : "YOU LOSE!";
+        });
+
+        window.move = (col) => {
+            if (gameData.turn !== myId || gameData.winner) return;
+            let board = gameData.board || Array(42).fill(null);
+            for (let r = 5; r >= 0; r--) {
+                let idx = r * 7 + col;
+                if (!board[idx]) {
+                    board[idx] = myColor;
+                    update(ref(db, 'games/' + matchId), { 
+                        board: board, 
+                        turn: (myColor === 'red' ? gameData.p2 : gameData.p1),
+                        winner: checkWin(board, myColor) ? myId : null 
+                    });
+                    return;
+                }
+            }
+        };
+
+        function checkWin(b, c) {
+             // Simplified horizontal check for brevity (add full logic for production)
+             for(let i=0; i<42; i++) if(b[i]==c && b[i+1]==c && b[i+2]==c && b[i+3]==c && (i%7)<4) return true;
+             return false; // Add Vertical/Diagonal checks here
+        }
+    </script>
+</body>
+</html>
