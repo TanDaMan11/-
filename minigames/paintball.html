@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Paintball</title>
+    <style>body { margin:0; background: #222; overflow: hidden; }</style>
+</head>
+<body>
+    <canvas id="game"></canvas>
+    <script type="module">
+        import { db } from './config.js';
+        import { ref, update, onValue, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        
+        const matchId = new URLSearchParams(location.search).get('m');
+        const myId = localStorage.getItem("playerId");
+
+        let players = {}, splats = [];
+        let myPos = { x: 100, y: 100 };
+
+        window.onmousemove = e => { myPos.x = e.clientX; myPos.y = e.clientY; };
+        window.onclick = () => {
+            push(ref(db, 'games/' + matchId + '/splats'), { x: myPos.x, y: myPos.y, color: 'lime' });
+        };
+
+        // Sync Loop
+        setInterval(() => {
+            update(ref(db, 'games/' + matchId + '/players/' + myId), myPos);
+        }, 50);
+
+        onValue(ref(db, 'games/' + matchId), snap => {
+            const data = snap.val() || {};
+            players = data.players || {};
+            splats = Object.values(data.splats || {});
+        });
+
+        function draw() {
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+            
+            // Draw Splats
+            splats.forEach(s => {
+                ctx.fillStyle = s.color;
+                ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI*2); ctx.fill();
+            });
+
+            // Draw Players
+            for(let id in players) {
+                let p = players[id];
+                ctx.fillStyle = (id === myId) ? "white" : "orange";
+                ctx.fillRect(p.x-10, p.y-10, 20, 20);
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>
