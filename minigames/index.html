@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ranked Minigames</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --accent: #3b82f6;
+            --bronze: #cd7f32;
+            --silver: #c0c0c0;
+            --gold: #ffd700;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* HEADER & PROFILE */
+        header {
+            width: 100%;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            border-bottom: 1px solid #334155;
+        }
+
+        .profile-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .rank-badge {
+            width: 50px;
+            height: 50px;
+            background: var(--bronze);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            box-shadow: 0 0 15px var(--bronze);
+            font-size: 24px;
+        }
+
+        .stats h2 { margin: 0; font-size: 18px; }
+        .stats p { margin: 0; font-size: 14px; color: #94a3b8; }
+
+        /* GAME GRID */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            width: 90%;
+            max-width: 1000px;
+            margin-top: 40px;
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border: 1px solid #334155;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            border-color: var(--accent);
+        }
+
+        .game-icon { font-size: 50px; margin-bottom: 15px; }
+
+        .live-count {
+            font-size: 12px;
+            color: #4ade80; 
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .live-dot {
+            width: 8px; height: 8px; background: #4ade80;
+            border-radius: 50%; box-shadow: 0 0 5px #4ade80;
+        }
+
+        /* MODAL (Searching for Player) */
+        #matchmaking-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid #334155;
+            border-top: 5px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>ARCADE HUB</h1>
+        <div class="profile-section">
+            <div class="stats">
+                <h2 id="username">Loading...</h2>
+                <p>Rank: <span id="rank-name" style="color: var(--bronze)">Bronze</span></p>
+            </div>
+            <div class="rank-badge" id="rank-icon">B</div>
+        </div>
+    </header>
+
+    <div class="grid-container">
+        <div class="game-card" onclick="findMatch('battleship')">
+            <div class="game-icon">🚢</div>
+            <h3>Battleships</h3>
+            <p>Strategy • Hidden Info</p>
+            <div class="live-count"><div class="live-dot"></div> <span id="count-battleship">0</span> Online</div>
+        </div>
+
+        <div class="game-card" onclick="findMatch('connect4')">
+            <div class="game-icon">🔴</div>
+            <h3>Connect 4</h3>
+            <p>Logic • Fast Paced</p>
+            <div class="live-count"><div class="live-dot"></div> <span id="count-connect4">0</span> Online</div>
+        </div>
+
+        <div class="game-card" onclick="findMatch('tanks')">
+            <div class="game-icon">🚜</div>
+            <h3>Tank Wars</h3>
+            <p>Aim • Physics</p>
+            <div class="live-count"><div class="live-dot"></div> <span id="count-tanks">0</span> Online</div>
+        </div>
+    </div>
+
+    <div id="matchmaking-overlay">
+        <div class="spinner"></div>
+        <h2 id="match-status">Searching for opponent...</h2>
+        <button onclick="cancelMatch()" style="margin-top:20px; padding:10px 30px; background:#ef4444; border:none; color:white; border-radius:5px; cursor:pointer;">CANCEL</button>
+    </div>
+
+    <script type="module">
+        // Import Firebase from CDN (Works on GitHub Pages)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue, push, update, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // YOUR SPECIFIC CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJudKhWjoBeBQw5TOYqXewpL8metr6gP0",
+            authDomain: "mini-games-f0c31.firebaseapp.com",
+            projectId: "mini-games-f0c31",
+            storageBucket: "mini-games-f0c31.firebasestorage.app",
+            messagingSenderId: "395360656567",
+            appId: "1:395360656567:web:87d287dd339bcdf8560132",
+            measurementId: "G-LQL0PBHK0E"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- PLAYER ID SETUP ---
+        let myId = localStorage.getItem("playerId");
+        if (!myId) {
+            myId = "player_" + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem("playerId", myId);
+        }
+        document.getElementById('username').innerText = "Player: " + myId.substr(0,5);
+
+        // --- 1. HANDLE CONNECTION STATUS ---
+        // When we disconnect (close tab), remove us from online lists
+        const presenceRef = ref(db, 'online/' + myId);
+        onDisconnect(presenceRef).remove();
+        set(presenceRef, true); // I am online
+
+        // --- 2. UPDATE RANK DISPLAY ---
+        const rankRef = ref(db, 'players/' + myId);
+        onValue(rankRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                updateRankUI(data.bp || 0);
+            } else {
+                set(rankRef, { bp: 0, name: "Player" }); // New player
+            }
+        });
+
+        function updateRankUI(bp) {
+            const rankName = document.getElementById('rank-name');
+            const rankIcon = document.getElementById('rank-icon');
+            
+            if (bp < 100) {
+                rankName.innerText = "Bronze (" + bp + " BP)";
+                rankName.style.color = "#cd7f32";
+                rankIcon.style.background = "#cd7f32";
+                rankIcon.innerText = "B";
+            } else if (bp < 300) {
+                rankName.innerText = "Silver (" + bp + " BP)";
+                rankName.style.color = "#c0c0c0";
+                rankIcon.style.background = "#c0c0c0";
+                rankIcon.innerText = "S";
+            } else {
+                rankName.innerText = "Gold (" + bp + " BP)";
+                rankName.style.color = "#ffd700";
+                rankIcon.style.background = "#ffd700";
+                rankIcon.innerText = "G";
+            }
+        }
+
+        // --- 3. MATCHMAKING SYSTEM ---
+        window.findMatch = function(gameType) {
+            document.getElementById('matchmaking-overlay').style.display = 'flex';
+            document.getElementById('match-status').innerText = `Searching for ${gameType}...`;
+
+            // Look in the queue
+            const queueRef = ref(db, 'queue/' + gameType);
+            
+            onValue(queueRef, (snapshot) => {
+                const queue = snapshot.val();
+                
+                if (queue) {
+                    // SOMEONE IS WAITING!
+                    const enemyId = Object.keys(queue)[0];
+                    if (enemyId !== myId) {
+                        const matchId = "match_" + Date.now();
+                        
+                        // Delete them from queue
+                        remove(ref(db, 'queue/' + gameType + '/' + enemyId));
+                        
+                        // Create Match
+                        set(ref(db, 'games/' + matchId), {
+                            p1: enemyId,
+                            p2: myId,
+                            turn: enemyId,
+                            board: "empty"
+                        });
+
+                        // Notify Players
+                        update(ref(db, 'players/' + enemyId), { currentMatch: matchId });
+                        update(ref(db, 'players/' + myId), { currentMatch: matchId });
+                        return;
+                    }
+                }
+
+                // NO ONE WAITING? ADD MYSELF
+                set(ref(db, 'queue/' + gameType + '/' + myId), { timestamp: Date.now() });
+                
+                // Add disconnect handler to remove me from queue if I close tab
+                onDisconnect(ref(db, 'queue/' + gameType + '/' + myId)).remove();
+
+            }, { onlyOnce: true });
+        };
+
+        // --- 4. LISTEN FOR MATCH START ---
+        onValue(ref(db, 'players/' + myId + '/currentMatch'), (snapshot) => {
+            const matchId = snapshot.val();
+            if (matchId) {
+                document.getElementById('match-status').innerText = "MATCH FOUND!";
+                document.getElementById('match-status').style.color = "#4ade80";
+                setTimeout(() => {
+                    // Clear the match status so we don't loop forever
+                    set(ref(db, 'players/' + myId + '/currentMatch'), null);
+                    // HERE IS WHERE WE WILL REDIRECT LATER
+                    alert("Sending you to game room: " + matchId);
+                    document.getElementById('matchmaking-overlay').style.display = 'none';
+                }, 1000);
+            }
+        });
+
+        window.cancelMatch = function() {
+            // Remove myself from all queues
+            remove(ref(db, 'queue/battleship/' + myId));
+            remove(ref(db, 'queue/connect4/' + myId));
+            remove(ref(db, 'queue/tanks/' + myId));
+            document.getElementById('matchmaking-overlay').style.display = 'none';
+        };
+    </script>
+</body>
+</html>
