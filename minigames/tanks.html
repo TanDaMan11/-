@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tanks</title>
+    <style>
+        body { margin: 0; background: #333; overflow: hidden; }
+        #canvas { background: #555; display: block; margin: 0 auto; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div id="ui">WASD to Move | Click to Shoot</div>
+    <canvas id="canvas"></canvas>
+
+    <script type="module">
+        import { db } from './config.js';
+        import { ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800; canvas.height = 600;
+
+        const matchId = new URLSearchParams(location.search).get('m');
+        const myId = localStorage.getItem("playerId");
+
+        let players = {}, bullets = [];
+        let myPos = { x: 100, y: 100, angle: 0 };
+        
+        // Controls
+        const keys = {};
+        window.onkeydown = e => keys[e.key] = true;
+        window.onkeyup = e => keys[e.key] = false;
+        
+        window.onmousedown = (e) => {
+            // Spawn bullet
+            const rect = canvas.getBoundingClientRect();
+            const angle = Math.atan2(e.clientY - rect.top - myPos.y, e.clientX - rect.left - myPos.x);
+            // Push bullet to DB
+            const bId = Date.now();
+            update(ref(db, 'games/' + matchId + '/bullets/' + bId), {
+                x: myPos.x, y: myPos.y, vx: Math.cos(angle)*5, vy: Math.sin(angle)*5, owner: myId
+            });
+        };
+
+        // Game Loop
+        setInterval(() => {
+            if(keys['w']) myPos.y -= 3;
+            if(keys['s']) myPos.y += 3;
+            if(keys['a']) myPos.x -= 3;
+            if(keys['d']) myPos.x += 3;
+
+            // Sync my pos to DB (Throttled slightly could be better, but direct is okay for small scale)
+            update(ref(db, 'games/' + matchId + '/players/' + myId), myPos);
+        }, 30);
+
+        // Render Loop
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Players
+            for(let id in players) {
+                let p = players[id];
+                ctx.fillStyle = (id === myId) ? 'lime' : 'red';
+                ctx.fillRect(p.x-15, p.y-15, 30, 30);
+            }
+
+            // Draw Bullets
+            bullets.forEach(b => {
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI*2); ctx.fill();
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        // DB Listeners
+        onValue(ref(db, 'games/' + matchId), (snap) => {
+            const data = snap.val();
+            if(!data) return;
+            players = data.players || {};
+            
+            // Handle bullets
+            bullets = [];
+            if(data.bullets) {
+                for(let bid in data.bullets) {
+                    let b = data.bullets[bid];
+                    b.x += b.vx; b.y += b.vy; // Local prediction
+                    bullets.push(b);
+                }
+            }
+        });
+
+        draw();
+    </script>
+</body>
+</html>
