@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimalist Hold'em</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="lobby-screen" class="screen active">
+    <header>
+      <h1>Minimal Hold'em</h1>
+      <div class="player-stats">
+        <p>Player: <span id="player-id">Loading...</span></p>
+        <p>Wallet: $<span id="wallet-balance" class="money">---</span></p>
+      </div>
+    </header>
+
+    <h2>Select a Table</h2>
+    <div id="table-container">
+      </div>
+  </div>
+
+  <div id="game-screen" class="screen">
+    <header>
+      <button id="btn-leave" onclick="location.reload()">Leave Table</button>
+      <h2><span id="current-table-id">Table</span></h2>
+    </header>
+    
+    <div id="table-surface">
+      <div id="community-cards">Waiting for game to start...</div>
+      
+      <div id="player-area">
+        <p>Your Hand:</p>
+        <div id="my-cards" class="cards-display">[ ? ] [ ? ]</div>
+      </div>
+    </div>
+
+    <div id="action-bar">
+      <button id="btn-fold" disabled>Fold</button>
+      <button id="btn-call" disabled>Check / Call</button>
+      <button id="btn-raise" disabled>Raise</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
