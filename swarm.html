@@ -634,14 +634,23 @@
         }
 
         // Mines
-        for(let i=mines.length-1;i>=0;i--) {
-            let m = mines[i]; m.timer--;
-            if (m.timer <= 0) {
-                spawnParticles(m.x, m.y, '#ffaa00', 20);
-                enemies.forEach(e => { if (Math.hypot(m.x-e.x, m.y-e.y) < 250) damageEnemy(e, m.dmg); });
-                mines.splice(i,1);
+        for (let i = mines.length - 1; i >= 0; i--) {
+    let m = mines[i];
+    m.timer--;
+
+    if (m.timer <= 0) {
+        spawnParticles(m.x, m.y, '#ffaa00', 20);
+
+        enemies.forEach(e => {
+            if (Math.hypot(m.x - e.x, m.y - e.y) < 250) {
+                if (e.type === 'titan') damageEnemy(e, m.dmg);      // boss normal dmg
+                else damageEnemy(e, m.dmg * 20);                     // normal enemies extra dmg
             }
-        }
+        });
+
+        mines.splice(i, 1);
+    }
+}
 
         // Bullets
         for (let i = bullets.length - 1; i >= 0; i--) {
@@ -706,7 +715,7 @@
             let m = meteors[i]; m.timer--;
             if (m.timer <= 0) {
                 spawnParticles(m.x, m.y, '#ff5500', 30);
-                enemies.forEach(e => { if (Math.hypot(m.x - e.x, m.y - e.y) < m.radius) damageEnemy(e, player.bulletDmg * 10); });
+                enemies.forEach(e => { if (Math.hypot(m.x - e.x, m.y - e.y) < m.radius) damageEnemy(e, player.bulletDmg * 15); });
                 meteors.splice(i, 1);
             }
         }
@@ -862,7 +871,7 @@
         if (player.score > 0) saveScoreToCloud(playerName, player.score);
         if (equipped.death === 'death_conf') {
             for (let i=0;i<100;i++) {
-                particles.push({ x: player.x, y: player.y, color: `hsl(${Math.random()*360},100%,50%)`, vx:(Math.random()-0.5)*50, vy:(Math.random()-0.5)*50, life:3.0 });
+                particles.push({ x: player.x, y: player.y, color: `hsl(${Math.random()*360},100%,50%)`, vx:(Math.random()-0.5)*400, vy:(Math.random()-0.5)*400, life:3.0 });
             }
         }
     }
