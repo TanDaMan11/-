@@ -870,8 +870,8 @@
         deathTimer = 0;
         if (player.score > 0) saveScoreToCloud(playerName, player.score);
         if (equipped.death === 'death_conf') {
-            for (let i=0;i<100;i++) {
-                particles.push({ x: player.x, y: player.y, color: `hsl(${Math.random()*360},100%,50%)`, vx:(Math.random()-0.5)*400, vy:(Math.random()-0.5)*400, life:3.0 });
+            for (let i=0;i<450;i++) {
+                particles.push({ x: player.x, y: player.y, color: `hsl(${Math.random()*360},100%,50%)`, vx:(Math.random()-0.5)*850, vy:(Math.random()-0.5)*850, life:5.0 });
             }
         }
     }
