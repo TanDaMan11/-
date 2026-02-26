@@ -253,7 +253,7 @@
 
 
         { id: 'death_default', type: 'death', name: 'STANDARD', cost: 0 },
-        { id: 'death_conf', type: 'death', name: 'CONFETTI', cost: 400 },
+        { id: '', type: 'death', name: 'CONFETTI', cost: 400 },
         { id: 'death_hole', type: 'death', name: 'BLACK HOLE', cost: 800 },
         { id: 'death_supernova', type: 'death', name: 'SUPERNOVA', cost: 2500 }
     ];
@@ -870,8 +870,8 @@
         deathTimer = 0;
         if (player.score > 0) saveScoreToCloud(playerName, player.score);
         if (equipped.death === 'death_conf') {
-            for (let i=0;i<450;i++) {
-                particles.push({ x: player.x, y: player.y, color: `hsl(${Math.random()*360},100%,50%)`, vx:(Math.random()-0.5)*850, vy:(Math.random()-0.5)*850, life:5.0 });
+            for (let i=0;i<700;i++) {
+                particles.push({ x: player.x, y: player.y, color: `hsl(${Math.random()*360},100%,50%)`, vx:(Math.random()-0.5)*900, vy:(Math.random()-0.5)*900, life:8.0 });
             }
         }
     }
