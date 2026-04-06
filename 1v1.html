@@ -609,7 +609,24 @@
             });
 
             socket.on('game_state', (data) => {
-                updateGameState(data);
+                // Update opponent's position
+                if (data.playerId === 1 && myPlayerId === 2) {
+                    player1.x = data.x;
+                    player1.y = data.y;
+                    player1.vx = data.vx;
+                    player1.vy = data.vy;
+                    player1.health = data.health;
+                    player1.attacking = data.attacking;
+                    player1.facingRight = data.facingRight;
+                } else if (data.playerId === 2 && myPlayerId === 1) {
+                    player2.x = data.x;
+                    player2.y = data.y;
+                    player2.vx = data.vx;
+                    player2.vy = data.vy;
+                    player2.health = data.health;
+                    player2.attacking = data.attacking;
+                    player2.facingRight = data.facingRight;
+                }
             });
 
             socket.on('game_over', (data) => {
@@ -1213,27 +1230,6 @@
                    rect1.x + rect1.width > rect2.x &&
                    rect1.y < rect2.y + rect2.height &&
                    rect1.y + rect1.height > rect2.y;
-        }
-
-        function updateGameState(data) {
-            if (data.p1) {
-                player1.x = data.p1.x;
-                player1.y = data.p1.y;
-                player1.vx = data.p1.vx;
-                player1.vy = data.p1.vy;
-                player1.health = data.p1.health;
-                player1.attacking = data.p1.attacking;
-                player1.facingRight = data.p1.facingRight;
-            }
-            if (data.p2) {
-                player2.x = data.p2.x;
-                player2.y = data.p2.y;
-                player2.vx = data.p2.vx;
-                player2.vy = data.p2.vy;
-                player2.health = data.p2.health;
-                player2.attacking = data.p2.attacking;
-                player2.facingRight = data.p2.facingRight;
-            }
         }
 
         function updateOpponentStatus() {
