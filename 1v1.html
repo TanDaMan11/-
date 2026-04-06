@@ -311,14 +311,26 @@
             font-size: 64px;
             font-weight: bold;
             text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
 
-        #restartBtn {
+        .match-info {
+            color: #ffd700;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 30px;
+        }
+
+        .button-group-overlay {
+            display: flex;
+            gap: 20px;
+        }
+
+        #playAgainBtn, #quitBtn {
             padding: 18px 50px;
             font-size: 24px;
             font-weight: bold;
-            background: linear-gradient(to bottom, #4CAF50, #45a049);
             color: white;
             border: none;
             border-radius: 10px;
@@ -327,7 +339,20 @@
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
         }
 
-        #restartBtn:hover {
+        #playAgainBtn {
+            background: linear-gradient(to bottom, #4CAF50, #45a049);
+        }
+
+        #playAgainBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        #quitBtn {
+            background: linear-gradient(to bottom, #ff6b6b, #ff5555);
+        }
+
+        #quitBtn:hover {
             transform: scale(1.05);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
         }
@@ -433,7 +458,11 @@
         <div id="startText">FIGHT!</div>
         <div id="overlay">
             <div id="winnerText">Player 1 Wins!</div>
-            <button id="restartBtn">Play Again</button>
+            <div class="match-info" id="matchInfo"></div>
+            <div class="button-group-overlay">
+                <button id="playAgainBtn">Play Again</button>
+                <button id="quitBtn">Return to Lobby</button>
+            </div>
         </div>
     </div>
 
@@ -564,7 +593,7 @@
                 }
             });
 
-            socket.on('restart', () => {
+            socket.on('next_round', () => {
                 resetGameState();
                 startCountdown();
             });
@@ -1113,8 +1142,6 @@
         let gameOver = false;
         let gameStarted = false;
         let screenShake = 0;
-        let pendingKills = [];
-        let killProcessed = { p1: false, p2: false };
         let lastStateSend = 0;
 
         function initGame() {
@@ -1134,8 +1161,6 @@
 
             gameOver = false;
             gameStarted = false;
-            pendingKills = [];
-            killProcessed = { p1: false, p2: false };
             floatingTexts.length = 0;
             particles.length = 0;
             screenShake = 0;
@@ -1195,9 +1220,6 @@
             player2.critGlow = 0;
             player2.onWall = false;
             player2.canWallJump = true;
-
-            pendingKills = [];
-            killProcessed = { p1: false, p2: false };
 
             document.getElementById('health1').style.width = '100%';
             document.getElementById('health2').style.width = '100%';
@@ -1367,64 +1389,32 @@
                         ));
                     }
 
-                    if (isLocal) {
-                        if (socket && isConnected) {
-                            socket.emit('attack_hit', {
-                                damage: damage,
-                                isCrit: isCrit,
-                                defenderHealth: defender.health
-                            });
-                        }
+                    if (isLocal && socket && isConnected) {
+                        socket.emit('attack_hit', {
+                            damage: damage,
+                            isCrit: isCrit,
+                            defenderHealth: defender.health
+                        });
                     }
 
                     if (defender.health <= 0 && !gameOver) {
-                        const defenderId = defender === player1 ? 'p1' : 'p2';
-                        if (!killProcessed[defenderId]) {
-                            killProcessed[defenderId] = true;
-                            pendingKills.push({
-                                attacker: attacker,
-                                defender: defender,
-                                attackerId: attacker === player1 ? 'p1' : 'p2',
-                                defenderId: defenderId,
-                                time: now
-                            });
-                        }
+                        endGame(attacker === player1 ? 1 : 2);
                     }
                 }
             }
-        }
-
-        function processKills() {
-            if (pendingKills.length === 0 || gameOver) return;
-            
-            let p1Dead = killProcessed.p1;
-            let p2Dead = killProcessed.p2;
-            
-            if (p1Dead && p2Dead) {
-                endGame(0);
-            } else if (p1Dead) {
-                endGame(2);
-            } else if (p2Dead) {
-                endGame(1);
-            }
-            
-            pendingKills = [];
         }
 
         function endGame(winner) {
             if (gameOver) return;
             gameOver = true;
             
-            if (winner === 0) {
-                lastWinner = null;
-                playDrawSound();
-            } else if (winner === 1) {
-                lastWinner = 1;
+            if (winner === 1) {
+                player1Wins++;
                 playSound(400, 'sine', 0.3, 0.4);
                 setTimeout(() => playSound(500, 'sine', 0.3, 0.4), 150);
                 setTimeout(() => playSound(600, 'sine', 0.5, 0.4), 300);
-            } else {
-                lastWinner = 2;
+            } else if (winner === 2) {
+                player2Wins++;
                 playSound(400, 'sine', 0.3, 0.4);
                 setTimeout(() => playSound(500, 'sine', 0.3, 0.4), 150);
                 setTimeout(() => playSound(600, 'sine', 0.5, 0.4), 300);
@@ -1436,14 +1426,27 @@
 
             const overlay = document.getElementById('overlay');
             const winnerText = document.getElementById('winnerText');
+            const matchInfo = document.getElementById('matchInfo');
+            const playAgainBtn = document.getElementById('playAgainBtn');
+            const quitBtn = document.getElementById('quitBtn');
             
-            if (winner === 0) {
-                winnerText.textContent = 'DRAW!';
-                winnerText.style.color = '#ffd700';
+            winnerText.textContent = `Player ${winner} Wins!`;
+            winnerText.style.color = winner === 1 ? '#4a9eff' : '#ff6b6b';
+            matchInfo.textContent = `${player1Wins} - ${player2Wins}`;
+            
+            // Check if match is over (best of 3)
+            if (player1Wins >= 2) {
+                winnerText.textContent = 'Player 1 Wins the Match!';
+                matchInfo.textContent = `Final Score: ${player1Wins} - ${player2Wins}`;
+                playAgainBtn.textContent = 'Return to Lobby';
+            } else if (player2Wins >= 2) {
+                winnerText.textContent = 'Player 2 Wins the Match!';
+                matchInfo.textContent = `Final Score: ${player1Wins} - ${player2Wins}`;
+                playAgainBtn.textContent = 'Return to Lobby';
             } else {
-                winnerText.textContent = `Player ${winner} Wins!`;
-                winnerText.style.color = winner === 1 ? '#4a9eff' : '#ff6b6b';
+                playAgainBtn.textContent = 'Play Again';
             }
+            
             overlay.classList.add('active');
         }
 
@@ -1484,12 +1487,42 @@
             tick();
         }
 
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            if (socket && isConnected) {
-                socket.emit('restart');
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            if (player1Wins >= 2 || player2Wins >= 2) {
+                // Match is over, return to lobby
+                player1Wins = 0;
+                player2Wins = 0;
+                gameContainer.classList.add('hidden');
+                lobby.classList.remove('hidden');
+                gameMode = 'offline';
+                if (socket) socket.disconnect();
+                hostBtn.disabled = false;
+                joinBtn.disabled = false;
+                codeInput.value = '';
+                mainButtons.style.display = 'flex';
+                joinForm.classList.remove('active');
+            } else {
+                // Play next round
+                resetGameState();
+                if (socket && isConnected) {
+                    socket.emit('next_round', { room: roomCode });
+                }
+                startCountdown();
             }
-            resetGameState();
-            startCountdown();
+        });
+
+        document.getElementById('quitBtn').addEventListener('click', () => {
+            player1Wins = 0;
+            player2Wins = 0;
+            gameContainer.classList.add('hidden');
+            lobby.classList.remove('hidden');
+            gameMode = 'offline';
+            if (socket) socket.disconnect();
+            hostBtn.disabled = false;
+            joinBtn.disabled = false;
+            codeInput.value = '';
+            mainButtons.style.display = 'flex';
+            joinForm.classList.remove('active');
         });
 
         function drawArena() {
@@ -1569,8 +1602,6 @@
 
                 checkAttackHit(player1, player2, myPlayerId === 1);
                 checkAttackHit(player2, player1, myPlayerId === 2);
-                
-                processKills();
                 
                 sendGameState();
             }
