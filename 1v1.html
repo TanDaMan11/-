@@ -547,7 +547,6 @@
                 if (gameMode === 'online') {
                     connectionStatus.textContent = 'Disconnected';
                     connectionStatus.classList.add('disconnected');
-                    showStatus('Connection lost. Please refresh.', true);
                 }
             });
 
@@ -565,7 +564,6 @@
                 myPlayerId = 1;
                 gameMode = 'online';
                 
-                // Show waiting room
                 lobby.classList.add('hidden');
                 waitingRoom.classList.add('active');
                 roomCodeDisplay.textContent = roomCode;
@@ -579,7 +577,6 @@
                 myPlayerId = 2;
                 gameMode = 'online';
                 
-                // Show waiting room
                 lobby.classList.add('hidden');
                 waitingRoom.classList.add('active');
                 roomCodeDisplay.textContent = roomCode;
@@ -589,7 +586,6 @@
 
             socket.on('player_joined', () => {
                 if (isHost) {
-                    // Host sees the start button
                     waitingStatus.textContent = 'Player joined! Ready to start?';
                     startBtn.style.display = 'block';
                 }
@@ -609,7 +605,6 @@
             });
 
             socket.on('game_state', (data) => {
-                // Update opponent's position
                 if (data.playerId === 1 && myPlayerId === 2) {
                     player1.x = data.x;
                     player1.y = data.y;
@@ -749,7 +744,6 @@
             if (socket) {
                 socket.emit('start_game', { room: roomCode });
             }
-            // Also start locally
             setTimeout(() => {
                 startGame();
             }, 500);
@@ -1259,7 +1253,6 @@
             
             document.getElementById('overlay').classList.add('active');
 
-            // Reset rematch states
             rematchReady = false;
             opponentRematchReady = false;
             updateOpponentStatus();
@@ -1268,7 +1261,6 @@
                 socket.emit('game_over', { winner, room: roomCode });
             }
 
-            // Check if match is over
             if (player1Wins >= MAX_WINS || player2Wins >= MAX_WINS) {
                 setTimeout(() => {
                     const finalWinner = player1Wins >= MAX_WINS ? 'Player 1' : 'Player 2';
@@ -1391,6 +1383,11 @@
 
         function animate() {
             ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            if (!player1 || !player2) {
+                animationId = requestAnimationFrame(animate);
+                return;
+            }
 
             if (countdownActive || gameStarted) {
                 if (!countdownActive && gameStarted) {
@@ -1547,7 +1544,6 @@
             if (player1Wins >= MAX_WINS || player2Wins >= MAX_WINS) {
                 returnToLobby();
             } else {
-                // Allow quit during round selection
                 returnToLobby();
             }
         });
