@@ -139,6 +139,75 @@
             background: rgba(255, 255, 255, 0.1);
         }
 
+        #waitingRoom {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            z-index: 999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+        }
+
+        #waitingRoom.active {
+            display: flex;
+        }
+
+        .waiting-content {
+            text-align: center;
+        }
+
+        .waiting-title {
+            font-size: 48px;
+            font-weight: bold;
+            color: #4a9eff;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #4a9eff;
+        }
+
+        .room-code {
+            font-size: 36px;
+            color: #ffd700;
+            margin-bottom: 30px;
+            font-weight: bold;
+            letter-spacing: 5px;
+        }
+
+        .waiting-status {
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 20px;
+        }
+
+        #startBtn {
+            padding: 20px 60px;
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(to bottom, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        #startBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px rgba(76, 175, 80, 0.6);
+        }
+
+        #startBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         #gameContainer {
             position: relative;
             width: 100vw;
@@ -375,6 +444,15 @@
         <p class="status" id="status"></p>
     </div>
 
+    <div id="waitingRoom">
+        <div class="waiting-content">
+            <div class="waiting-title">⚔️ Game Room</div>
+            <div class="room-code" id="roomCodeDisplay"></div>
+            <div class="waiting-status" id="waitingStatus"></div>
+            <button id="startBtn" style="display: none;">Start Game</button>
+        </div>
+    </div>
+
     <div id="gameContainer" class="hidden">
         <canvas id="gameCanvas"></canvas>
         <div class="connection-status" id="connectionStatus">Offline</div>
@@ -420,6 +498,7 @@
         let opponentRematchReady = false;
 
         const lobby = document.getElementById('lobby');
+        const waitingRoom = document.getElementById('waitingRoom');
         const gameContainer = document.getElementById('gameContainer');
         const hostBtn = document.getElementById('hostBtn');
         const joinBtn = document.getElementById('joinBtn');
@@ -430,6 +509,9 @@
         const status = document.getElementById('status');
         const mainButtons = document.getElementById('mainButtons');
         const connectionStatus = document.getElementById('connectionStatus');
+        const startBtn = document.getElementById('startBtn');
+        const waitingStatus = document.getElementById('waitingStatus');
+        const roomCodeDisplay = document.getElementById('roomCodeDisplay');
 
         function showStatus(text, isError = false) {
             status.textContent = text;
@@ -482,9 +564,13 @@
                 isHost = true;
                 myPlayerId = 1;
                 gameMode = 'online';
-                showStatus(`Room created! Code: ${roomCode} - Waiting for opponent...`);
-                connectionStatus.textContent = 'Waiting for opponent...';
-                connectionStatus.classList.add('waiting');
+                
+                // Show waiting room
+                lobby.classList.add('hidden');
+                waitingRoom.classList.add('active');
+                roomCodeDisplay.textContent = roomCode;
+                waitingStatus.textContent = 'Waiting for opponent to join...';
+                startBtn.style.display = 'none';
             });
 
             socket.on('room_joined', (data) => {
@@ -492,24 +578,25 @@
                 isHost = false;
                 myPlayerId = 2;
                 gameMode = 'online';
-                showStatus('Joined room! Waiting for host to start...');
-                connectionStatus.textContent = 'Connected - Waiting...';
+                
+                // Show waiting room
+                lobby.classList.add('hidden');
+                waitingRoom.classList.add('active');
+                roomCodeDisplay.textContent = roomCode;
+                waitingStatus.textContent = 'Connected! Waiting for host to start...';
+                startBtn.style.display = 'none';
             });
 
             socket.on('player_joined', () => {
                 if (isHost) {
-                    showStatus('Player joined! Starting game...');
-                    setTimeout(() => {
-                        startGame();
-                    }, 1500);
+                    // Host sees the start button
+                    waitingStatus.textContent = 'Player joined! Ready to start?';
+                    startBtn.style.display = 'block';
                 }
             });
 
             socket.on('game_start', () => {
-                showStatus('Starting game...');
-                setTimeout(() => {
-                    startGame();
-                }, 500);
+                startGame();
             });
 
             socket.on('player_left', () => {
@@ -639,8 +726,20 @@
             }
         });
 
+        startBtn.addEventListener('click', () => {
+            startBtn.disabled = true;
+            waitingStatus.textContent = 'Starting game...';
+            if (socket) {
+                socket.emit('start_game', { room: roomCode });
+            }
+            // Also start locally
+            setTimeout(() => {
+                startGame();
+            }, 500);
+        });
+
         function startGame() {
-            lobby.classList.add('hidden');
+            waitingRoom.classList.remove('active');
             gameContainer.classList.remove('hidden');
             initGame();
         }
@@ -1255,6 +1354,7 @@
 
         function returnToLobby() {
             gameContainer.classList.add('hidden');
+            waitingRoom.classList.remove('active');
             lobby.classList.remove('hidden');
             gameMode = 'offline';
             player1Wins = 0;
@@ -1263,6 +1363,7 @@
             if (socket) socket.disconnect();
             hostBtn.disabled = false;
             joinBtn.disabled = false;
+            startBtn.disabled = false;
             showStatus('');
         }
 
