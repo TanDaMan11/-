@@ -241,10 +241,24 @@
             font-size: 64px;
             font-weight: bold;
             text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+
+        .match-score {
+            color: #ffd700;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
             margin-bottom: 40px;
         }
 
-        #restartBtn {
+        .button-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        #rematchBtn {
             padding: 18px 50px;
             font-size: 24px;
             font-weight: bold;
@@ -257,9 +271,39 @@
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
         }
 
-        #restartBtn:hover {
+        #rematchBtn:hover {
             transform: scale(1.05);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        #rematchBtn.ready {
+            background: linear-gradient(to bottom, #ffd700, #ffed4e);
+            color: #000;
+        }
+
+        #quitBtn {
+            padding: 18px 50px;
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(to bottom, #ff6b6b, #ff5555);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        #quitBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        #opponentStatus {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 18px;
+            margin-top: 20px;
+            min-height: 25px;
         }
 
         #countdown {
@@ -354,7 +398,12 @@
         <div id="startText">FIGHT!</div>
         <div id="overlay">
             <div id="winnerText">Player 1 Wins!</div>
-            <button id="restartBtn">Play Again</button>
+            <div class="match-score" id="matchScore"></div>
+            <div class="button-container">
+                <button id="rematchBtn">Rematch</button>
+                <button id="quitBtn">Quit</button>
+            </div>
+            <div id="opponentStatus"></div>
         </div>
     </div>
 
@@ -367,6 +416,8 @@
         let roomCode = null;
         let myPlayerId = null;
         let gameMode = 'offline';
+        let rematchReady = false;
+        let opponentRematchReady = false;
 
         const lobby = document.getElementById('lobby');
         const gameContainer = document.getElementById('gameContainer');
@@ -446,10 +497,19 @@
             });
 
             socket.on('player_joined', () => {
-                showStatus('Player joined! Starting game...');
+                if (isHost) {
+                    showStatus('Player joined! Starting game...');
+                    setTimeout(() => {
+                        startGame();
+                    }, 1500);
+                }
+            });
+
+            socket.on('game_start', () => {
+                showStatus('Starting game...');
                 setTimeout(() => {
                     startGame();
-                }, 1500);
+                }, 500);
             });
 
             socket.on('player_left', () => {
@@ -459,10 +519,6 @@
                 if (!gameOver) {
                     endGame(0);
                 }
-            });
-
-            socket.on('game_start', () => {
-                startGame();
             });
 
             socket.on('game_state', (data) => {
@@ -475,9 +531,16 @@
                 }
             });
 
-            socket.on('restart', () => {
-                resetGameState();
-                startCountdown();
+            socket.on('rematch_ready', () => {
+                opponentRematchReady = true;
+                updateOpponentStatus();
+                if (rematchReady) {
+                    startNewRound();
+                }
+            });
+
+            socket.on('match_over', () => {
+                returnToLobby();
             });
 
             socket.on('error', (data) => {
@@ -598,6 +661,7 @@
         const WALL_FRICTION = 0.85;
         const WALL_JUMP_BONUS = -14;
         const PLAYER_MARGIN = 50;
+        const MAX_WINS = 3;
 
         const camera = {
             x: WORLD_WIDTH / 2,
@@ -937,6 +1001,17 @@
                 this.jumpCount = this.maxJumps;
             }
 
+            darkenColor(color) {
+                const num = parseInt(color.replace("#",""), 16);
+                const amt = 30;
+                const usePound = true;
+                const R = (num >> 16) & 255;
+                const G = (num >> 8) & 255;
+                const B = num & 255;
+                return (usePound?"#":"") + (0x1000000 + (R-amt<255?R-amt<0?0:R-amt:255)*0x10000 +
+                    (G-amt<255?G-amt<0?0:G-amt:255)*0x100 + (B-amt<255?B-amt<0?0:B-amt:255)).toString(16).slice(1);
+            }
+
             draw(ctx) {
                 ctx.save();
                 
@@ -997,575 +1072,387 @@
 
                 ctx.restore();
             }
-
-            darkenColor(color) {
-                const r = parseInt(color.slice(1, 3), 16);
-                const g = parseInt(color.slice(3, 5), 16);
-                const b = parseInt(color.slice(5, 7), 16);
-                return `rgb(${Math.floor(r * 0.65)}, ${Math.floor(g * 0.65)}, ${Math.floor(b * 0.65)})`;
-            }
         }
 
         let player1, player2;
-        const floatingTexts = [];
-        const particles = [];
-        const keys = {};
         let gameOver = false;
         let gameStarted = false;
+        let countdownActive = false;
         let screenShake = 0;
-        let pendingKills = [];
-        let killProcessed = { p1: false, p2: false };
-        let lastStateSend = 0;
+        let floatingTexts = [];
+        let particles = [];
+        let animationId = null;
 
-        function initGame() {
-            player1 = new Player(WORLD_WIDTH * 0.25, '#4a9eff', {
-                left: 'KeyA',
-                right: 'KeyD',
-                jump: 'KeyW',
-                attack: 'KeyS'
-            }, true);
+        const keys = {};
 
-            player2 = new Player(WORLD_WIDTH * 0.75, '#ff6b6b', {
-                left: 'ArrowLeft',
-                right: 'ArrowRight',
-                jump: 'ArrowUp',
-                attack: 'ArrowDown'
-            }, false);
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
 
-            gameOver = false;
-            gameStarted = false;
-            pendingKills = [];
-            killProcessed = { p1: false, p2: false };
-            floatingTexts.length = 0;
-            particles.length = 0;
-            screenShake = 0;
-            
-            camera.x = WORLD_WIDTH / 2;
-            camera.y = WORLD_HEIGHT / 2;
-            camera.zoom = 1;
-            
-            document.getElementById('health1').style.width = '100%';
-            document.getElementById('health2').style.width = '100%';
-            updateComboDisplay();
-            document.getElementById('overlay').classList.remove('active');
-            
-            if (gameMode === 'online') {
-                connectionStatus.textContent = isConnected ? 'Connected' : 'Offline';
-                connectionStatus.classList.toggle('disconnected', !isConnected);
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        function updateComboDisplay() {
+            if (player1.combo > 0) {
+                document.getElementById('combo1').textContent = `Combo x${player1.combo}`;
+                document.getElementById('combo1').style.opacity = '1';
             } else {
-                connectionStatus.textContent = 'Offline';
-                connectionStatus.classList.remove('disconnected');
+                document.getElementById('combo1').style.opacity = '0';
             }
 
-            startCountdown();
-            gameLoop();
+            if (player2.combo > 0) {
+                document.getElementById('combo2').textContent = `Combo x${player2.combo}`;
+                document.getElementById('combo2').style.opacity = '1';
+            } else {
+                document.getElementById('combo2').style.opacity = '0';
+            }
         }
 
-        function resetGameState() {
-            if (!player1 || !player2) return;
-            
-            player1.x = WORLD_WIDTH * 0.25;
-            player1.y = GROUND;
-            player1.vx = 0;
-            player1.vy = 0;
-            player1.health = 100;
-            player1.combo = 0;
-            player1.facingRight = true;
-            player1.attacking = false;
-            player1.attackCooldown = 0;
-            player1.hitStun = 0;
-            player1.jumpCount = 0;
-            player1.canCrit = false;
-            player1.critGlow = 0;
-            player1.onWall = false;
-            player1.canWallJump = true;
-
-            player2.x = WORLD_WIDTH * 0.75;
-            player2.y = GROUND;
-            player2.vx = 0;
-            player2.vy = 0;
-            player2.health = 100;
-            player2.combo = 0;
-            player2.facingRight = false;
-            player2.attacking = false;
-            player2.attackCooldown = 0;
-            player2.hitStun = 0;
-            player2.jumpCount = 0;
-            player2.canCrit = false;
-            player2.critGlow = 0;
-            player2.onWall = false;
-            player2.canWallJump = true;
-
-            pendingKills = [];
-            killProcessed = { p1: false, p2: false };
-
-            document.getElementById('health1').style.width = '100%';
-            document.getElementById('health2').style.width = '100%';
-            updateComboDisplay();
-
-            floatingTexts.length = 0;
-            particles.length = 0;
-            screenShake = 0;
-            
-            camera.x = WORLD_WIDTH / 2;
-            camera.y = WORLD_HEIGHT / 2;
-            camera.zoom = 1;
-            
-            gameOver = false;
-            gameStarted = false;
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
         }
 
         function updateGameState(data) {
-            if (!player1 || !player2 || !gameStarted || gameOver) return;
-            
-            if (myPlayerId === 1 && data.player2) {
-                player1.x = data.player2.x;
-                player1.y = data.player2.y;
-                player1.vx = data.player2.vx;
-                player1.vy = data.player2.vy;
-                player1.facingRight = data.player2.facingRight;
-                player1.attacking = data.player2.attacking;
-                player1.attackDuration = data.player2.attackDuration;
-                player1.health = data.player2.health;
-                player1.canCrit = data.player2.canCrit;
-                player1.critGlow = data.player2.critGlow;
-                player1.grounded = data.player2.grounded;
-                document.getElementById('health1').style.width = player1.health + '%';
+            if (data.p1) {
+                player1.x = data.p1.x;
+                player1.y = data.p1.y;
+                player1.vx = data.p1.vx;
+                player1.vy = data.p1.vy;
+                player1.health = data.p1.health;
+                player1.attacking = data.p1.attacking;
+                player1.facingRight = data.p1.facingRight;
             }
-            
-            if (myPlayerId === 2 && data.player1) {
-                player2.x = data.player1.x;
-                player2.y = data.player1.y;
-                player2.vx = data.player1.vx;
-                player2.vy = data.player1.vy;
-                player2.facingRight = data.player1.facingRight;
-                player2.attacking = data.player1.attacking;
-                player2.attackDuration = data.player1.attackDuration;
-                player2.health = data.player1.health;
-                player2.canCrit = data.player1.canCrit;
-                player2.critGlow = data.player1.critGlow;
-                player2.grounded = data.player1.grounded;
-                document.getElementById('health2').style.width = player2.health + '%';
+            if (data.p2) {
+                player2.x = data.p2.x;
+                player2.y = data.p2.y;
+                player2.vx = data.p2.vx;
+                player2.vy = data.p2.vy;
+                player2.health = data.p2.health;
+                player2.attacking = data.p2.attacking;
+                player2.facingRight = data.p2.facingRight;
             }
         }
 
-        function sendGameState() {
-            if (!socket || !isConnected || !gameStarted || gameOver) return;
-            
-            const now = Date.now();
-            if (now - lastStateSend < 16) return;
-            lastStateSend = now;
-            
-            const myState = myPlayerId === 1 ? player1 : player2;
-            
-            socket.emit('game_state', {
-                x: myState.x,
-                y: myState.y,
-                vx: myState.vx,
-                vy: myState.vy,
-                facingRight: myState.facingRight,
-                attacking: myState.attacking,
-                attackDuration: myState.attackDuration,
-                health: myState.health,
-                canCrit: myState.canCrit,
-                critGlow: myState.critGlow,
-                grounded: myState.grounded
-            });
-        }
-
-        function sendAttackHit(attacker, defender, damage, isCrit) {
-            if (!socket || !isConnected) return;
-            
-            socket.emit('attack_hit', {
-                attackerId: attacker === player1 ? 1 : 2,
-                defenderId: defender === player1 ? 1 : 2,
-                damage: damage,
-                isCrit: isCrit,
-                defenderHealth: defender.health
-            });
+        function updateOpponentStatus() {
+            const statusEl = document.getElementById('opponentStatus');
+            if (opponentRematchReady) {
+                statusEl.textContent = '✓ Opponent is ready!';
+                statusEl.style.color = '#4CAF50';
+            } else {
+                statusEl.textContent = 'Waiting for opponent...';
+                statusEl.style.color = 'rgba(255, 255, 255, 0.7)';
+            }
         }
 
         function handleGameOver(winner) {
-            endGame(winner);
-        }
+            gameOver = true;
+            if (winner === 1) player1Wins++;
+            if (winner === 2) player2Wins++;
 
-        function updateCamera() {
-            const viewWidth = WIDTH / camera.zoom;
-            const viewHeight = HEIGHT / camera.zoom;
+            const winnerName = winner === 1 ? 'Player 1' : 'Player 2';
+            document.getElementById('winnerText').textContent = `${winnerName} Wins!`;
+            document.getElementById('matchScore').textContent = `${player1Wins} - ${player2Wins}`;
             
-            const minX = Math.min(player1.x, player2.x) - 100;
-            const maxX = Math.max(player1.x, player2.x) + 100;
-            const worldSpan = maxX - minX;
+            const rematchBtn = document.getElementById('rematchBtn');
+            rematchBtn.textContent = 'Rematch';
+            rematchBtn.classList.remove('ready');
+            rematchBtn.disabled = false;
             
-            let targetX = (player1.x + player2.x) / 2;
-            let targetY = Math.min(player1.y, player2.y) - 100;
+            document.getElementById('overlay').classList.add('active');
 
-            const halfViewW = viewWidth / 2;
-            const minCamX = halfViewW;
-            const maxCamX = WORLD_WIDTH - halfViewW;
-            targetX = Math.max(minCamX, Math.min(maxCamX, targetX));
+            // Reset rematch states
+            rematchReady = false;
+            opponentRematchReady = false;
+            updateOpponentStatus();
 
-            const halfViewH = viewHeight / 2;
-            const minCamY = halfViewH;
-            const maxCamY = WORLD_HEIGHT - halfViewH;
-            targetY = Math.max(minCamY, Math.min(maxCamY, targetY));
-
-            camera.x += (targetX - camera.x) * 0.08;
-            camera.y += (targetY - camera.y) * 0.05;
-
-            const idealZoom = Math.max(0.5, Math.min(1, 900 / worldSpan));
-            camera.targetZoom = idealZoom;
-            camera.zoom += (camera.targetZoom - camera.zoom) * 0.05;
-        }
-
-        function updateComboDisplay() {
-            if (!player1 || !player2) return;
-            
-            const combo1El = document.getElementById('combo1');
-            const combo2El = document.getElementById('combo2');
-            
-            combo1El.style.opacity = player1.combo >= 2 ? '1' : '0';
-            combo2El.style.opacity = player2.combo >= 2 ? '1' : '0';
-            
-            if (player1.combo >= 2) combo1El.textContent = `Combo x${player1.combo}`;
-            if (player2.combo >= 2) combo2El.textContent = `Combo x${player2.combo}`;
-        }
-
-        function checkAttackHit(attacker, defender, isLocal) {
-            if (!attacker.attacking || attacker.attackDuration < 6) return;
-
-            const attackBox = attacker.getAttackBox();
-            const defenderBox = {
-                x: defender.x - defender.width / 2,
-                y: defender.y - defender.height,
-                width: defender.width,
-                height: defender.height
-            };
-
-            if (attackBox.x < defenderBox.x + defenderBox.width &&
-                attackBox.x + attackBox.width > defenderBox.x &&
-                attackBox.y < defenderBox.y + defenderBox.height &&
-                attackBox.y + attackBox.height > defenderBox.y) {
-
-                const now = Date.now();
-                if (now - attacker.lastHitTime > 180) {
-                    attacker.lastHitTime = now;
-                    
-                    attacker.combo++;
-                    attacker.comboTimer = 150;
-                    updateComboDisplay();
-
-                    const isCrit = attacker.canCrit;
-                    let damage = 10;
-                    
-                    if (attacker.combo >= 2) {
-                        damage += 5 * (attacker.combo - 1);
-                    }
-                    
-                    if (isCrit) {
-                        damage *= 2.5;
-                        playCritSound();
-                        floatingTexts.push(new FloatingText(
-                            defender.x,
-                            defender.y - defender.height - 30,
-                            'CRITICAL!',
-                            '#ffd700'
-                        ));
-                    } else {
-                        playHitSound();
-                    }
-
-                    const knockbackDir = attacker.facingRight ? 1 : -1;
-                    defender.takeDamage(damage, knockbackDir, isCrit, attacker.y);
-
-                    floatingTexts.push(new FloatingText(
-                        defender.x,
-                        defender.y - defender.height - 70,
-                        `-${Math.floor(damage)}`,
-                        isCrit ? '#ffd700' : '#ff4444'
-                    ));
-
-                    for (let i = 0; i < (isCrit ? 20 : 10); i++) {
-                        particles.push(new Particle(
-                            defender.x + (Math.random() - 0.5) * 30,
-                            defender.y - defender.height / 2,
-                            isCrit ? '#ffd700' : '#ff6b6b'
-                        ));
-                    }
-
-                    if (isLocal) {
-                        sendAttackHit(attacker, defender, damage, isCrit);
-                    }
-
-                    if (defender.health <= 0 && !gameOver) {
-                        const defenderId = defender === player1 ? 'p1' : 'p2';
-                        if (!killProcessed[defenderId]) {
-                            killProcessed[defenderId] = true;
-                            pendingKills.push({
-                                attacker: attacker,
-                                defender: defender,
-                                attackerId: attacker === player1 ? 'p1' : 'p2',
-                                defenderId: defenderId,
-                                time: now
-                            });
-                        }
-                    }
-                }
+            if (gameMode === 'online' && socket) {
+                socket.emit('game_over', { winner, room: roomCode });
             }
-        }
 
-        function processKills() {
-            if (pendingKills.length === 0 || gameOver) return;
-            
-            let p1Dead = killProcessed.p1;
-            let p2Dead = killProcessed.p2;
-            
-            if (p1Dead && p2Dead) {
-                const p1Kill = pendingKills.find(k => k.defenderId === 'p2');
-                const p2Kill = pendingKills.find(k => k.defenderId === 'p1');
-                
-                if (p1Kill && p2Kill) {
-                    const timeDiff = Math.abs(p1Kill.time - p2Kill.time);
-                    if (timeDiff < 200) {
-                        endGame(0);
-                        return;
-                    }
-                }
-                
-                endGame(pendingKills[0].attackerId === 'p1' ? 1 : 2);
-            } else if (p1Dead) {
-                endGame(2);
-            } else if (p2Dead) {
-                endGame(1);
+            // Check if match is over
+            if (player1Wins >= MAX_WINS || player2Wins >= MAX_WINS) {
+                setTimeout(() => {
+                    const finalWinner = player1Wins >= MAX_WINS ? 'Player 1' : 'Player 2';
+                    document.getElementById('winnerText').textContent = `${finalWinner} Wins the Match!`;
+                    document.getElementById('matchScore').textContent = `Final Score: ${player1Wins} - ${player2Wins}`;
+                    
+                    document.getElementById('rematchBtn').disabled = true;
+                    document.getElementById('quitBtn').textContent = 'Return to Lobby';
+                }, 500);
             }
-            
-            pendingKills = [];
         }
 
         function endGame(winner) {
-            if (gameOver) return;
             gameOver = true;
-            
-            if (winner === 0) {
-                lastWinner = null;
-                player1Wins++;
-                player2Wins++;
-                playDrawSound();
-            } else if (winner === 1) {
-                player1Wins++;
-                lastWinner = 1;
-                playSound(400, 'sine', 0.3, 0.4);
-                setTimeout(() => playSound(500, 'sine', 0.3, 0.4), 150);
-                setTimeout(() => playSound(600, 'sine', 0.5, 0.4), 300);
-            } else {
-                player2Wins++;
-                lastWinner = 2;
-                playSound(400, 'sine', 0.3, 0.4);
-                setTimeout(() => playSound(500, 'sine', 0.3, 0.4), 150);
-                setTimeout(() => playSound(600, 'sine', 0.5, 0.4), 300);
-            }
+            gameStarted = false;
+            handleGameOver(winner);
+        }
 
-            if (socket && isConnected) {
-                socket.emit('game_over', { winner });
-            }
+        function resetGameState() {
+            gameOver = false;
+            gameStarted = false;
+            countdownActive = false;
+            player1.health = 100;
+            player2.health = 100;
+            player1.x = 400;
+            player2.x = WORLD_WIDTH - 400;
+            player1.y = GROUND;
+            player2.y = GROUND;
+            player1.vx = 0;
+            player2.vx = 0;
+            player1.vy = 0;
+            player2.vy = 0;
+            player1.combo = 0;
+            player2.combo = 0;
+            floatingTexts = [];
+            particles = [];
+            document.getElementById('overlay').classList.remove('active');
+            document.getElementById('health1').style.width = '100%';
+            document.getElementById('health2').style.width = '100%';
+            updateComboDisplay();
+            startCountdown();
+        }
 
-            const overlay = document.getElementById('overlay');
-            const winnerText = document.getElementById('winnerText');
-            
-            if (winner === 0) {
-                winnerText.textContent = 'DRAW!';
-                winnerText.style.color = '#ffd700';
-            } else {
-                winnerText.textContent = `Player ${winner} Wins!`;
-                winnerText.style.color = winner === 1 ? '#4a9eff' : '#ff6b6b';
-            }
-            overlay.classList.add('active');
+        function startNewRound() {
+            rematchReady = false;
+            opponentRematchReady = false;
+            resetGameState();
         }
 
         function startCountdown() {
+            countdownActive = true;
+            gameStarted = false;
+            let count = 3;
             const countdownEl = document.getElementById('countdown');
             const startTextEl = document.getElementById('startText');
-            
-            countdownEl.style.display = 'block';
-            let count = 3;
-            
-            function tick() {
+
+            const countInterval = setInterval(() => {
                 if (count > 0) {
                     countdownEl.textContent = count;
+                    countdownEl.style.display = 'block';
                     countdownEl.style.opacity = '1';
-                    countdownEl.style.transform = 'translate(-50%, -50%) scale(1.2)';
                     playCountdown();
-                    
-                    setTimeout(() => {
-                        countdownEl.style.opacity = '0';
-                        countdownEl.style.transform = 'translate(-50%, -50%) scale(0.8)';
-                    }, 400);
-                    
                     count--;
-                    setTimeout(tick, 700);
                 } else {
+                    clearInterval(countInterval);
                     countdownEl.style.display = 'none';
                     startTextEl.style.display = 'block';
                     startTextEl.style.opacity = '1';
                     playFightSound();
-                    gameStarted = true;
+                    
                     setTimeout(() => {
-                        startTextEl.style.opacity = '0';
                         startTextEl.style.display = 'none';
-                    }, 400);
+                        gameStarted = true;
+                        countdownActive = false;
+                    }, 800);
                 }
-            }
-            
-            tick();
+            }, 1000);
         }
 
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            if (socket && isConnected) {
-                socket.emit('restart');
-            }
-            resetGameState();
+        function returnToLobby() {
+            gameContainer.classList.add('hidden');
+            lobby.classList.remove('hidden');
+            gameMode = 'offline';
+            player1Wins = 0;
+            player2Wins = 0;
+            if (animationId) cancelAnimationFrame(animationId);
+            if (socket) socket.disconnect();
+            hostBtn.disabled = false;
+            joinBtn.disabled = false;
+            showStatus('');
+        }
+
+        function initGame() {
+            gameOver = false;
+            gameStarted = false;
+            countdownActive = false;
+            floatingTexts = [];
+            particles = [];
+            
+            player1 = new Player(400, '#4a9eff', {
+                left: 'a',
+                right: 'd',
+                jump: 'w',
+                attack: 'j'
+            }, true);
+
+            player2 = new Player(WORLD_WIDTH - 400, '#ff6b6b', {
+                left: 'arrowleft',
+                right: 'arrowright',
+                jump: 'arrowup',
+                attack: 'k'
+            }, false);
+
+            updateComboDisplay();
             startCountdown();
-        });
-
-        function drawArena() {
-            const viewWidth = WIDTH / camera.zoom;
-            const viewHeight = HEIGHT / camera.zoom;
-            const leftEdge = camera.x - viewWidth / 2;
-            const rightEdge = camera.x + viewWidth / 2;
-            
-            const groundY = GROUND;
-            
-            ctx.fillStyle = '#3d3d3d';
-            const groundStartX = Math.max(0, Math.floor(leftEdge / 40) * 40);
-            const groundEndX = Math.min(WORLD_WIDTH, Math.ceil(rightEdge / 40) * 40);
-            ctx.fillRect(groundStartX, groundY, groundEndX - groundStartX, WORLD_HEIGHT - groundY);
-            
-            ctx.fillStyle = '#2d3436';
-            ctx.fillRect(Math.max(0, leftEdge), groundY, rightEdge - Math.max(0, leftEdge), 20);
-            
-            ctx.fillStyle = '#636e72';
-            for (let i = Math.max(0, Math.floor(leftEdge / 40) * 40); i < Math.min(WORLD_WIDTH, Math.ceil(rightEdge / 40) * 40); i += 40) {
-                if (i >= leftEdge && i < rightEdge) {
-                    ctx.fillRect(i, groundY, 30, 8);
-                }
-            }
-
-            ctx.fillStyle = '#222';
-            ctx.fillRect(Math.max(0, leftEdge), WORLD_HEIGHT - 30, Math.min(WORLD_WIDTH, rightEdge) - Math.max(0, leftEdge), 30);
+            animate();
         }
 
-        function drawBackground() {
-            const viewWidth = WIDTH / camera.zoom;
-            const viewHeight = HEIGHT / camera.zoom;
-            const leftEdge = camera.x - viewWidth / 2;
-            const rightEdge = camera.x + viewWidth / 2;
-            const topEdge = camera.y - viewHeight / 2;
-            const bottomEdge = camera.y + viewHeight / 2;
-            
-            const grad = ctx.createLinearGradient(0, topEdge, 0, bottomEdge);
-            grad.addColorStop(0, '#0a0a15');
-            grad.addColorStop(0.5, '#0f0f23');
-            grad.addColorStop(0.7, '#16213e');
-            grad.addColorStop(1, '#1a1a2e');
-            ctx.fillStyle = grad;
-            ctx.fillRect(leftEdge, topEdge, viewWidth, viewHeight);
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-            for (let i = 0; i < 150; i++) {
-                const x = (i * 137) % WORLD_WIDTH;
-                const y = (i * 89) % (GROUND - 100);
-                if (x >= leftEdge && x <= rightEdge && y >= topEdge && y <= bottomEdge) {
-                    const size = (i % 3) + 1;
-                    const twinkle = Math.sin(Date.now() * 0.002 + i) * 0.3 + 0.7;
-                    ctx.globalAlpha = twinkle * 0.6;
-                    ctx.fillRect(x, y, size, size);
-                }
-            }
-            ctx.globalAlpha = 1;
-        }
-
-        function gameLoop() {
-            if (!player1 || !player2) return;
-            
-            WIDTH = window.innerWidth;
-            HEIGHT = window.innerHeight;
-            canvas.width = WIDTH;
-            canvas.height = HEIGHT;
-
+        function animate() {
             ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-            ctx.save();
-            
-            if (screenShake > 0) {
-                const shakeX = (Math.random() - 0.5) * screenShake;
-                const shakeY = (Math.random() - 0.5) * screenShake;
-                ctx.translate(shakeX, shakeY);
-                screenShake *= 0.9;
-                if (screenShake < 0.5) screenShake = 0;
+            if (countdownActive || gameStarted) {
+                if (!countdownActive && gameStarted) {
+                    player1.update(keys, player2, gameMode === 'offline' || (gameMode === 'online' && myPlayerId === 1));
+                    player2.update(keys, player1, gameMode === 'offline' || (gameMode === 'online' && myPlayerId === 2));
+
+                    if (gameMode === 'online' && socket && (myPlayerId === 1 || myPlayerId === 2)) {
+                        const myPlayer = myPlayerId === 1 ? player1 : player2;
+                        socket.emit('game_state', {
+                            room: roomCode,
+                            playerId: myPlayerId,
+                            x: myPlayer.x,
+                            y: myPlayer.y,
+                            vx: myPlayer.vx,
+                            vy: myPlayer.vy,
+                            health: myPlayer.health,
+                            attacking: myPlayer.attacking,
+                            facingRight: myPlayer.facingRight
+                        });
+                    }
+
+                    const p1Attack = player1.getAttackBox();
+                    const p2Attack = player2.getAttackBox();
+
+                    if (player1.attacking && checkCollision(p1Attack, {
+                        x: player2.x - player2.width / 2,
+                        y: player2.y - player2.height,
+                        width: player2.width,
+                        height: player2.height
+                    })) {
+                        const isCrit = player1.canCrit;
+                        const damage = isCrit ? 25 : 15;
+                        const knockbackDir = player1.facingRight ? 1 : -1;
+                        
+                        player2.takeDamage(damage, knockbackDir, isCrit, player1.y);
+                        player1.combo++;
+                        player1.comboTimer = 120;
+                        
+                        floatingTexts.push(new FloatingText(player2.x, player2.y - 100, `-${damage}`, '#ff6b6b'));
+                        
+                        if (isCrit) {
+                            playCritSound();
+                            for (let i = 0; i < 8; i++) {
+                                particles.push(new Particle(player2.x, player2.y, '#ffd700'));
+                            }
+                        } else {
+                            playHitSound();
+                            for (let i = 0; i < 4; i++) {
+                                particles.push(new Particle(player2.x, player2.y, '#ff6b6b'));
+                            }
+                        }
+                        
+                        updateComboDisplay();
+                        
+                        if (player2.health <= 0) {
+                            endGame(1);
+                        }
+                    }
+
+                    if (player2.attacking && checkCollision(p2Attack, {
+                        x: player1.x - player1.width / 2,
+                        y: player1.y - player1.height,
+                        width: player1.width,
+                        height: player1.height
+                    })) {
+                        const isCrit = player2.canCrit;
+                        const damage = isCrit ? 25 : 15;
+                        const knockbackDir = player2.facingRight ? 1 : -1;
+                        
+                        player1.takeDamage(damage, knockbackDir, isCrit, player2.y);
+                        player2.combo++;
+                        player2.comboTimer = 120;
+                        
+                        floatingTexts.push(new FloatingText(player1.x, player1.y - 100, `-${damage}`, '#4a9eff'));
+                        
+                        if (isCrit) {
+                            playCritSound();
+                            for (let i = 0; i < 8; i++) {
+                                particles.push(new Particle(player1.x, player1.y, '#ffd700'));
+                            }
+                        } else {
+                            playHitSound();
+                            for (let i = 0; i < 4; i++) {
+                                particles.push(new Particle(player1.x, player1.y, '#4a9eff'));
+                            }
+                        }
+                        
+                        updateComboDisplay();
+                        
+                        if (player1.health <= 0) {
+                            endGame(2);
+                        }
+                    }
+                }
             }
 
-            updateCamera();
+            floatingTexts = floatingTexts.filter(t => t.update());
+            particles = particles.filter(p => p.update());
+
+            camera.targetZoom = 1 + (Math.abs(player2.x - player1.x) / 5000) * 0.5;
+            camera.zoom += (camera.targetZoom - camera.zoom) * 0.05;
+            camera.x = (player1.x + player2.x) / 2;
+            camera.y = WORLD_HEIGHT / 2;
+
+            ctx.save();
             ctx.translate(WIDTH / 2, HEIGHT / 2);
             ctx.scale(camera.zoom, camera.zoom);
             ctx.translate(-camera.x, -camera.y);
 
-            drawBackground();
-            drawArena();
-
-            if (gameStarted && !gameOver) {
-                const myPlayer = myPlayerId === 1 ? player1 : player2;
-                const otherPlayer = myPlayerId === 1 ? player2 : player1;
-                
-                myPlayer.update(keys, otherPlayer, true);
-                otherPlayer.update({}, myPlayer, false);
-
-                checkAttackHit(player1, player2, myPlayerId === 1);
-                checkAttackHit(player2, player1, myPlayerId === 2);
-                
-                processKills();
-                
-                sendGameState();
+            if (screenShake > 0) {
+                ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+                screenShake *= 0.8;
             }
+
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+            ctx.fillStyle = '#2d3561';
+            ctx.fillRect(0, GROUND, WORLD_WIDTH, WORLD_HEIGHT - GROUND);
 
             player1.draw(ctx);
             player2.draw(ctx);
 
-            for (let i = particles.length - 1; i >= 0; i--) {
-                if (!particles[i].update()) {
-                    particles.splice(i, 1);
-                } else {
-                    particles[i].draw(ctx);
-                }
-            }
-
-            for (let i = floatingTexts.length - 1; i >= 0; i--) {
-                if (!floatingTexts[i].update()) {
-                    floatingTexts.splice(i, 1);
-                } else {
-                    floatingTexts[i].draw(ctx);
-                }
-            }
+            particles.forEach(p => p.draw(ctx));
+            floatingTexts.forEach(t => t.draw(ctx));
 
             ctx.restore();
 
-            ctx.save();
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            drawScoreCrown(ctx, player1Wins, true);
-            drawScoreCrown(ctx, player2Wins, false);
-            ctx.restore();
+            if (!gameOver) {
+                drawScoreCrown(ctx, player1Wins, true);
+                drawScoreCrown(ctx, player2Wins, false);
+            }
 
-            requestAnimationFrame(gameLoop);
+            animationId = requestAnimationFrame(animate);
         }
 
-        document.addEventListener('keydown', (e) => {
-            keys[e.code] = true;
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
-                e.preventDefault();
+        document.getElementById('rematchBtn').addEventListener('click', () => {
+            const rematchBtn = document.getElementById('rematchBtn');
+            rematchBtn.textContent = '✓ Ready!';
+            rematchBtn.classList.add('ready');
+            rematchBtn.disabled = true;
+            rematchReady = true;
+
+            if (gameMode === 'online' && socket) {
+                socket.emit('rematch_ready', { room: roomCode });
+            } else if (gameMode === 'offline') {
+                startNewRound();
             }
+
+            updateOpponentStatus();
         });
 
-        document.addEventListener('keyup', (e) => {
-            keys[e.code] = false;
+        document.getElementById('quitBtn').addEventListener('click', () => {
+            if (player1Wins >= MAX_WINS || player2Wins >= MAX_WINS) {
+                returnToLobby();
+            } else {
+                // Allow quit during round selection
+                returnToLobby();
+            }
         });
 
         window.addEventListener('resize', () => {
