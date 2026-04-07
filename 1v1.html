@@ -323,8 +323,12 @@
         }
 
         .button-group-overlay {
-            display: flex;
+            display: none;
             gap: 20px;
+        }
+
+        .button-group-overlay.active {
+            display: flex;
         }
 
         #playAgainBtn, #quitBtn {
@@ -348,6 +352,11 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
         }
 
+        #playAgainBtn.ready {
+            background: linear-gradient(to bottom, #ffd700, #ffed4e);
+            color: #000;
+        }
+
         #quitBtn {
             background: linear-gradient(to bottom, #ff6b6b, #ff5555);
         }
@@ -355,6 +364,13 @@
         #quitBtn:hover {
             transform: scale(1.05);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        #opponentStatus {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 18px;
+            margin-top: 20px;
+            min-height: 25px;
         }
 
         #countdown {
@@ -463,6 +479,7 @@
                 <button id="playAgainBtn">Play Again</button>
                 <button id="quitBtn">Return to Lobby</button>
             </div>
+            <div id="opponentStatus"></div>
         </div>
     </div>
 
@@ -475,6 +492,8 @@
         let roomCode = null;
         let myPlayerId = null;
         let gameMode = 'offline';
+        let rematchReady = false;
+        let opponentRematchReady = false;
 
         const lobby = document.getElementById('lobby');
         const waitingRoom = document.getElementById('waitingRoom');
@@ -499,6 +518,23 @@
 
         function generateCode() {
             return Math.floor(1000 + Math.random() * 9000).toString();
+        }
+
+        function returnToLobby() {
+            player1Wins = 0;
+            player2Wins = 0;
+            rematchReady = false;
+            opponentRematchReady = false;
+            gameContainer.classList.add('hidden');
+            waitingRoom.classList.remove('active');
+            lobby.classList.remove('hidden');
+            gameMode = 'offline';
+            if (socket) socket.disconnect();
+            hostBtn.disabled = false;
+            joinBtn.disabled = false;
+            codeInput.value = '';
+            mainButtons.style.display = 'flex';
+            joinForm.classList.remove('active');
         }
 
         function connectToServer() {
@@ -575,12 +611,7 @@
             });
 
             socket.on('player_left', () => {
-                showStatus('Other player left the game');
-                connectionStatus.textContent = 'Opponent left';
-                connectionStatus.classList.add('disconnected');
-                if (!gameOver) {
-                    endGame(0);
-                }
+                returnToLobby();
             });
 
             socket.on('game_state', (data) => {
@@ -593,9 +624,17 @@
                 }
             });
 
-            socket.on('next_round', () => {
-                resetGameState();
-                startCountdown();
+            socket.on('rematch_ready', () => {
+                opponentRematchReady = true;
+                updateOpponentStatus();
+                if (rematchReady && opponentRematchReady) {
+                    resetGameState();
+                    startCountdown();
+                }
+            });
+
+            socket.on('return_lobby', () => {
+                returnToLobby();
             });
 
             socket.on('error', (data) => {
@@ -737,7 +776,6 @@
 
         let player1Wins = 0;
         let player2Wins = 0;
-        let lastWinner = null;
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -773,11 +811,6 @@
         function playFightSound() {
             playSound(600, 'sine', 0.2, 0.5);
             setTimeout(() => playSound(800, 'sine', 0.3, 0.5), 100);
-        }
-
-        function playDrawSound() {
-            playSound(300, 'sine', 0.3, 0.4);
-            setTimeout(() => playSound(300, 'sine', 0.3, 0.4), 200);
         }
 
         class FloatingText {
@@ -1173,6 +1206,7 @@
             document.getElementById('health2').style.width = '100%';
             updateComboDisplay();
             document.getElementById('overlay').classList.remove('active');
+            document.querySelector('.button-group-overlay').classList.remove('active');
             
             if (gameMode === 'online') {
                 connectionStatus.textContent = isConnected ? 'Connected' : 'Offline';
@@ -1235,6 +1269,8 @@
             
             gameOver = false;
             gameStarted = false;
+            rematchReady = false;
+            opponentRematchReady = false;
         }
 
         function updateGameState(data) {
@@ -1261,7 +1297,7 @@
             if (!socket || !isConnected || !gameStarted || gameOver) return;
             
             const now = Date.now();
-            if (now - lastStateSend < 16) return;
+            if (now - lastStateSend < 50) return;
             lastStateSend = now;
             
             const myState = myPlayerId === 1 ? player1 : player2;
@@ -1279,6 +1315,17 @@
                 critGlow: myState.critGlow,
                 grounded: myState.grounded
             });
+        }
+
+        function updateOpponentStatus() {
+            const statusEl = document.getElementById('opponentStatus');
+            if (opponentRematchReady) {
+                statusEl.textContent = '✓ Opponent is ready!';
+                statusEl.style.color = '#4CAF50';
+            } else {
+                statusEl.textContent = 'Waiting for opponent...';
+                statusEl.style.color = 'rgba(255, 255, 255, 0.7)';
+            }
         }
 
         function handleGameOver(winner) {
@@ -1427,24 +1474,23 @@
             const overlay = document.getElementById('overlay');
             const winnerText = document.getElementById('winnerText');
             const matchInfo = document.getElementById('matchInfo');
+            const buttonGroup = document.querySelector('.button-group-overlay');
             const playAgainBtn = document.getElementById('playAgainBtn');
             const quitBtn = document.getElementById('quitBtn');
             
-            winnerText.textContent = `Player ${winner} Wins!`;
+            winnerText.textContent = `Player ${winner} Wins Round!`;
             winnerText.style.color = winner === 1 ? '#4a9eff' : '#ff6b6b';
             matchInfo.textContent = `${player1Wins} - ${player2Wins}`;
             
-            // Check if match is over (best of 3)
-            if (player1Wins >= 2) {
-                winnerText.textContent = 'Player 1 Wins the Match!';
+            // Check if match is over (first to 3 wins)
+            if (player1Wins >= 3 || player2Wins >= 3) {
+                winnerText.textContent = player1Wins >= 3 ? 'Player 1 Wins the Match!' : 'Player 2 Wins the Match!';
                 matchInfo.textContent = `Final Score: ${player1Wins} - ${player2Wins}`;
-                playAgainBtn.textContent = 'Return to Lobby';
-            } else if (player2Wins >= 2) {
-                winnerText.textContent = 'Player 2 Wins the Match!';
-                matchInfo.textContent = `Final Score: ${player1Wins} - ${player2Wins}`;
-                playAgainBtn.textContent = 'Return to Lobby';
-            } else {
                 playAgainBtn.textContent = 'Play Again';
+                playAgainBtn.classList.remove('ready');
+                buttonGroup.classList.add('active');
+            } else {
+                buttonGroup.classList.remove('active');
             }
             
             overlay.classList.add('active');
@@ -1488,41 +1534,30 @@
         }
 
         document.getElementById('playAgainBtn').addEventListener('click', () => {
-            if (player1Wins >= 2 || player2Wins >= 2) {
-                // Match is over, return to lobby
-                player1Wins = 0;
-                player2Wins = 0;
-                gameContainer.classList.add('hidden');
-                lobby.classList.remove('hidden');
-                gameMode = 'offline';
-                if (socket) socket.disconnect();
-                hostBtn.disabled = false;
-                joinBtn.disabled = false;
-                codeInput.value = '';
-                mainButtons.style.display = 'flex';
-                joinForm.classList.remove('active');
-            } else {
-                // Play next round
-                resetGameState();
-                if (socket && isConnected) {
-                    socket.emit('next_round', { room: roomCode });
+            if (player1Wins >= 3 || player2Wins >= 3) {
+                // Match is over
+                const playAgainBtn = document.getElementById('playAgainBtn');
+                if (!rematchReady) {
+                    rematchReady = true;
+                    playAgainBtn.textContent = '✓ Ready!';
+                    playAgainBtn.classList.add('ready');
+                    playAgainBtn.disabled = true;
+                    
+                    if (socket && isConnected) {
+                        socket.emit('rematch_ready', { room: roomCode });
+                    }
+                    
+                    updateOpponentStatus();
+                    document.getElementById('opponentStatus').style.display = 'block';
                 }
-                startCountdown();
             }
         });
 
         document.getElementById('quitBtn').addEventListener('click', () => {
-            player1Wins = 0;
-            player2Wins = 0;
-            gameContainer.classList.add('hidden');
-            lobby.classList.remove('hidden');
-            gameMode = 'offline';
-            if (socket) socket.disconnect();
-            hostBtn.disabled = false;
-            joinBtn.disabled = false;
-            codeInput.value = '';
-            mainButtons.style.display = 'flex';
-            joinForm.classList.remove('active');
+            if (socket && isConnected) {
+                socket.emit('return_lobby', { room: roomCode });
+            }
+            returnToLobby();
         });
 
         function drawArena() {
