@@ -485,6 +485,7 @@
 
     <script>
         const SERVER_URL = 'https://sword-duel-server.onrender.com';
+        const GAME_TICK_RATE = 100; // Milliseconds between game updates (slows down to 10 updates per second)
         
         let socket = null;
         let isHost = false;
@@ -1176,6 +1177,7 @@
         let gameStarted = false;
         let screenShake = 0;
         let lastStateSend = 0;
+        let lastGameTick = 0;
 
         function initGame() {
             player1 = new Player(WORLD_WIDTH * 0.25, '#4a9eff', {
@@ -1186,10 +1188,10 @@
             }, true);
 
             player2 = new Player(WORLD_WIDTH * 0.75, '#ff6b6b', {
-                left: 'ArrowLeft',
-                right: 'ArrowRight',
-                jump: 'ArrowUp',
-                attack: 'ArrowDown'
+                left: 'KeyA',
+                right: 'KeyD',
+                jump: 'KeyW',
+                attack: 'KeyS'
             }, false);
 
             gameOver = false;
@@ -1197,6 +1199,7 @@
             floatingTexts.length = 0;
             particles.length = 0;
             screenShake = 0;
+            lastGameTick = 0;
             
             camera.x = WORLD_WIDTH / 2;
             camera.y = WORLD_HEIGHT / 2;
@@ -1262,6 +1265,7 @@
             floatingTexts.length = 0;
             particles.length = 0;
             screenShake = 0;
+            lastGameTick = 0;
             
             camera.x = WORLD_WIDTH / 2;
             camera.y = WORLD_HEIGHT / 2;
@@ -1489,8 +1493,16 @@
                 playAgainBtn.textContent = 'Play Again';
                 playAgainBtn.classList.remove('ready');
                 buttonGroup.classList.add('active');
+                document.getElementById('opponentStatus').style.display = 'none';
             } else {
-                buttonGroup.classList.remove('active');
+                // Show round screen for 3 seconds, then start next round
+                overlay.classList.add('active');
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    resetGameState();
+                    startCountdown();
+                }, 3000);
+                return;
             }
             
             overlay.classList.add('active');
@@ -1523,6 +1535,7 @@
                     startTextEl.style.opacity = '1';
                     playFightSound();
                     gameStarted = true;
+                    lastGameTick = Date.now();
                     setTimeout(() => {
                         startTextEl.style.opacity = '0';
                         startTextEl.style.display = 'none';
@@ -1628,7 +1641,11 @@
             drawBackground();
             drawArena();
 
-            if (gameStarted && !gameOver) {
+            // Game tick with fixed rate
+            const now = Date.now();
+            if (gameStarted && !gameOver && now - lastGameTick >= GAME_TICK_RATE) {
+                lastGameTick = now;
+                
                 const myPlayer = myPlayerId === 1 ? player1 : player2;
                 const otherPlayer = myPlayerId === 1 ? player2 : player1;
                 
