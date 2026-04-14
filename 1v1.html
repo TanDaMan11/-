@@ -1301,7 +1301,7 @@
             if (!socket || !isConnected || !gameStarted || gameOver) return;
             
             const now = Date.now();
-            if (now - lastStateSend < 50) return;
+            if (now - lastStateSend < 24) return;
             lastStateSend = now;
             
             const myState = myPlayerId === 1 ? player1 : player2;
