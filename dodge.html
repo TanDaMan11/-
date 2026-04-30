@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Dodge</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0d0d1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Press Start 2P', monospace;
+            overflow: hidden;
+        }
+
+        .game-wrapper {
+            position: relative;
+            display: flex;
+            gap: 20px;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            border: 4px solid #4a4a6a;
+            box-shadow: 0 0 50px rgba(78, 205, 196, 0.3);
+        }
+
+        .side-panel {
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel-box {
+            background: rgba(26, 26, 46, 0.9);
+            border: 2px solid #4a4a6a;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .panel-title {
+            color: #4ecdc4;
+            font-size: 10px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            color: #fff;
+            font-size: 20px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 8px;
+            margin-top: 5px;
+        }
+
+        .level-display {
+            color: #ffd700;
+            font-size: 24px;
+            text-shadow: 2px 2px 0 #8b6914;
+        }
+
+        .enemy-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 8px;
+            color: #888;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .score {
+            color: #fff;
+            font-size: 16px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .high-score {
+            color: #ffd700;
+            font-size: 12px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .start-screen, .game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .title {
+            font-size: 40px;
+            color: #ff6b6b;
+            text-shadow: 4px 4px 0 #8b0000;
+            animation: bounce 1s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: #888;
+            max-width: 280px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .btn {
+            background: #4ecdc4;
+            border: none;
+            padding: 20px 40px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 16px;
+            color: #1a1a2e;
+            cursor: pointer;
+            transition: all 0.1s;
+            box-shadow: 0 6px 0 #2d8a85;
+        }
+
+        .btn:hover {
+            background: #6ee7df;
+        }
+
+        .btn:active {
+            box-shadow: 0 0 0 #2d8a85;
+            transform: translateY(6px);
+        }
+
+        .final-score {
+            font-size: 32px;
+            color: #ffd700;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .final-level {
+            font-size: 16px;
+            color: #4ecdc4;
+        }
+
+        .controls {
+            font-size: 10px;
+            color: #666;
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .bonus-text {
+            position: absolute;
+            font-size: 12px;
+            color: #ffd700;
+            text-shadow: 1px 1px 0 #000;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-40px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <canvas id="game" width="600" height="800"></canvas>
+        
+        <div class="side-panel">
+            <div class="panel-box">
+                <div class="panel-title">Level</div>
+                <div class="level-display" id="levelDisplay">1</div>
+            </div>
+            <div class="panel-box">
+                <div class="panel-title">Score</div>
+                <div class="stat-value" id="scoreDisplay">0</div>
+                <div class="stat-label">BEST: <span id="highScoreDisplay">0</span></div>
+            </div>
+            <div class="panel-box">
+                <div class="panel-title">Enemies</div>
+                <div class="enemy-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff6b6b;"></div>
+                        <span>Splits</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #48dbfb;"></div>
+                        <span>Wiggles</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #feca57;"></div>
+                        <span>Fast</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #a55eea;"></div>
+                        <span>Big</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff9ff3;"></div>
+                        <span>Bounces</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2ed573;"></div>
+                        <span>Teleports</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ui-overlay">
+            <div class="score">SCORE: <span id="scoreDisplay2">0</span></div>
+            <div class="high-score">LVL <span id="levelDisplay2">1</span></div>
+        </div>
+
+        <div class="start-screen" id="startScreen">
+            <div class="title">PIXEL DODGE</div>
+            <div class="subtitle">Dodge the falling blocks!</div>
+            <button class="btn" onclick="startGame()">START</button>
+            <div class="controls">← → or A/D to move</div>
+        </div>
+
+        <div class="game-over-screen hidden" id="gameOverScreen">
+            <div class="title" style="color: #ff4757;">GAME OVER</div>
+            <div class="final-score">SCORE: <span id="finalScore">0</span></div>
+            <div class="final-level">LEVEL: <span id="finalLevel">1</span></div>
+            <button class="btn" onclick="startGame()">RETRY</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let level = 1;
+        let highScore = localStorage.getItem('pixelDodgeHighScore') || 0;
+        let frameCount = 0;
+        let difficulty = 1;
+
+        // Player
+        const player = {
+            x: 284,
+            y: 700,
+            width: 32,
+            height: 32,
+            speed: 5,
+            color: '#4ecdc4',
+            invincible: false,
+            invincibleTimer: 0
+        };
+
+        // Falling objects
+        let enemies = [];
+        let particles = [];
+
+        // Input
+        const keys = {
+            left: false,
+            right: false
+        };
+
+        // Initialize high score display
+        document.getElementById('highScoreDisplay').textContent = highScore;
+
+        // Pixel art sprite definitions
+        const playerSprite = [
+            [0,0,0,1,1,0,0,0],
+            [0,0,1,1,1,1,0,0],
+            [0,1,1,1,1,1,1,0],
+            [1,1,0,1,1,0,1,1],
+            [1,1,1,1,1,1,1,1],
+            [0,1,1,1,1,1,1,0],
+            [0,1,0,0,0,0,1,0],
+            [1,1,0,0,0,0,1,1]
+        ];
+
+        const enemySprites = [
+            [1,1,1,0,0,1,1,1],
+            [1,0,0,1,1,0,0,1],
+            [1,0,1,1,1,1,0,1],
+            [0,1,1,1,1,1,1,0],
+            [0,1,1,1,1,1,1,0],
+            [1,0,1,1,1,1,0,1],
+            [1,0,0,1,1,0,0,1],
+            [1,1,1,0,0,1,1,1]
+        ];
+
+// Enemy types with different behaviors
+        const enemyTypes = {
+            red: {
+                color: '#ff6b6b',
+                speed: 3,
+                behavior: 'split',
+                desc: 'Splits in two!'
+            },
+            blue: {
+                color: '#48dbfb',
+                speed: 2.5,
+                behavior: 'wiggle',
+                desc: 'Wiggles side to side!'
+            },
+            yellow: {
+                color: '#feca57',
+                speed: 9,
+                behavior: 'fast',
+                desc: 'Fast!'
+            },
+            purple: {
+                color: '#a55eea',
+                speed: 2,
+                behavior: 'big',
+                desc: 'Slow but big!'
+            },
+            pink: {
+                color: '#ff9ff3',
+                speed: 3.5,
+                behavior: 'bounce',
+                desc: 'Bounces up and down!'
+            },
+            green: {
+                color: '#2ed573',
+                speed: 3,
+                behavior: 'teleport',
+                desc: 'Teleports!'
+            }
+        };
+
+        // Draw pixel sprite
+        function drawSprite(sprite, x, y, size, color) {
+            ctx.fillStyle = color;
+            for (let row = 0; row < sprite.length; row++) {
+                for (let col = 0; col < sprite[row].length; col++) {
+                    if (sprite[row][col]) {
+                        ctx.fillRect(x + col * size, y + row * size, size, size);
+                    }
+                }
+            }
+        }
+
+        // Input handlers
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+        });
+
+        // Touch controls
+        let touchStartX = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touchX = e.touches[0].clientX;
+            const diff = touchX - touchStartX;
+            
+            if (diff < -15) { keys.left = true; keys.right = false; }
+            else if (diff > 15) { keys.right = true; keys.left = false; }
+            else { keys.left = false; keys.right = false; }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            keys.left = false;
+            keys.right = false;
+        });
+
+        // Spawn enemy
+        function spawnEnemy(x = null, isSplit = false, splitDir = 0) {
+            const types = Object.keys(enemyTypes);
+            const typeKey = types[Math.floor(Math.random() * types.length)];
+            const type = enemyTypes[typeKey];
+            
+            let size = typeKey === 'purple' ? 55 : (typeKey === 'yellow' ? 20 : 28);
+            size = size + Math.random() * 10;
+            
+            const levelSpeedBonus = (level - 1) * 0.6;
+            
+            const enemy = {
+                x: x !== null ? x : Math.random() * (canvas.width - size),
+                y: -size,
+                width: size,
+                height: size,
+                baseSpeed: type.speed,
+                speed: type.speed + levelSpeedBonus + Math.random() * 0.5,
+                color: type.color,
+                behavior: type.behavior,
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.2,
+                wiggleOffset: Math.random() * Math.PI * 2,
+                splitDone: isSplit,
+                bounceDir: 1,
+                bounceOffset: 0,
+                splitForce: splitDir
+            };
+            
+            enemies.push(enemy);
+        }
+
+        // Spawn split enemy with horizontal velocity (bigger size)
+        function spawnSplitEnemy(x, y, vx, vy) {
+            const size = 32;
+            const enemy = {
+                x: x - size/2,
+                y: y,
+                width: size,
+                height: size,
+                speed: 2.5,
+                vx: vx,
+                vy: vy,
+                color: '#ff6b6b',
+                behavior: 'splitChild',
+                rotation: 0,
+                rotationSpeed: 0.3,
+                splitDone: true
+            };
+            enemies.push(enemy);
+        }
+
+        // Create particles
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    size: 3 + Math.random() * 5,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        // Check level up
+        function checkLevelUp() {
+            const newLevel = Math.floor(score / 500) + 1;
+            if (newLevel > level) {
+                level = newLevel;
+                document.getElementById('levelDisplay').textContent = level;
+                document.getElementById('levelDisplay2').textContent = level;
+                
+                // Level up effect
+                createParticles(player.x + player.width/2, player.y + player.height/2, '#ffd700', 20);
+            }
+        }
+
+        // Update game
+        function update() {
+            if (!gameRunning) return;
+
+            frameCount++;
+
+            // Move player
+            if (keys.left && player.x > 0) {
+                player.x -= player.speed;
+            }
+            if (keys.right && player.x < canvas.width - player.width) {
+                player.x += player.speed;
+            }
+
+            // Spawn enemies - spawn rate increases significantly with level
+            const baseSpawnRate = 50;
+            const spawnRate = Math.max(12, baseSpawnRate - level * 4.5);
+            if (frameCount % Math.floor(spawnRate) === 0) {
+                spawnEnemy();
+            }
+
+            // Update enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                
+                // Red split behavior - split around 50-80% down
+                if (enemy.behavior === 'split' && !enemy.splitDone && enemy.y > canvas.height * 0.5 + Math.random() * canvas.height * 0.3) {
+                    enemy.splitDone = true;
+                    // Create 2 split enemies going outward and slightly up (larger size)
+                    spawnSplitEnemy(enemy.x + enemy.width / 2 - 20, enemy.y, -3, -2.5);
+                    spawnSplitEnemy(enemy.x + enemy.width / 2 + 20, enemy.y, 3, -2.5);
+                    enemies.splice(i, 1);
+                    continue;
+                }
+                
+                // Green teleport behavior - teleport 1-3 times to random spots
+                if (enemy.behavior === 'teleport' && !enemy.teleportCount) {
+                    enemy.teleportCount = 0;
+                    enemy.teleportMax = 1 + Math.floor(Math.random() * 3);
+                    enemy.lastTeleportY = 0;
+                }
+                if (enemy.behavior === 'teleport' && enemy.teleportCount < enemy.teleportMax) {
+                    // Calculate random Y positions to teleport (spread across screen)
+                    const teleportPositions = [
+                        canvas.height * 0.3,
+                        canvas.height * 0.5,
+                        canvas.height * 0.7
+                    ];
+                    for (let tpY of teleportPositions) {
+                        if (enemy.y > tpY && enemy.y < tpY + 50 && enemy.lastTeleportY !== tpY) {
+                            enemy.x = Math.random() * (canvas.width - enemy.width);
+                            enemy.teleportCount++;
+                            enemy.lastTeleportY = tpY;
+                            break;
+                        }
+                    }
+                }
+                
+                // Blue wiggle further
+                if (enemy.behavior === 'wiggle') {
+                    enemy.x += Math.sin(frameCount * 0.08 + enemy.wiggleOffset) * 5;
+                } else if (enemy.behavior === 'bounce') {
+                    enemy.bounceOffset += 0.2 * enemy.bounceDir;
+                    if (Math.abs(enemy.bounceOffset) > 50) {
+                        enemy.bounceDir *= -1;
+                    }
+                    enemy.y += Math.sin(frameCount * 0.12) * 2.5;
+                } else if (enemy.behavior === 'splitChild') {
+                    enemy.x += enemy.vx;
+                    enemy.y += enemy.vy;
+                    enemy.vy += 0.15;
+                } else if (enemy.behavior === 'teleport') {
+                    // Already handled in separate logic below
+                }
+                
+                enemy.x = Math.max(0, Math.min(canvas.width - enemy.width, enemy.x));
+                
+                enemy.y += enemy.speed;
+                enemy.rotation += enemy.rotationSpeed;
+
+                // Remove off-screen enemies
+                if (enemy.y > canvas.height) {
+                    enemies.splice(i, 1);
+                    score += 10;
+                    
+                    document.getElementById('scoreDisplay').textContent = score;
+                    document.getElementById('scoreDisplay2').textContent = score;
+                    
+                    checkLevelUp();
+                }
+
+                // Collision detection
+                if (!player.invincible && checkCollision(player, enemy)) {
+                    gameOver();
+                }
+            }
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.3;
+                p.life -= 0.02;
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Invincibility frames
+            if (player.invincible) {
+                player.invincibleTimer--;
+                if (player.invincibleTimer <= 0) {
+                    player.invincible = false;
+                }
+            }
+        }
+
+        // Collision detection
+        function checkCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        // Draw game
+        function draw() {
+            // Clear canvas with gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#0d0d1a');
+            gradient.addColorStop(1, '#1a1a2e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background stars
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 80; i++) {
+                const x = (i * 73) % canvas.width;
+                const y = (i * 47 + frameCount * 0.3) % canvas.height;
+                ctx.fillRect(x, y, 2, 2);
+            }
+
+            // Draw player
+            if (!player.invincible || Math.floor(frameCount / 4) % 2 === 0) {
+                drawSprite(playerSprite, player.x, player.y, 4, player.color);
+            }
+
+            // Draw enemies
+            enemies.forEach(enemy => {
+                ctx.save();
+                ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+                ctx.rotate(enemy.rotation);
+                drawSprite(enemySprites, -enemy.width / 2, -enemy.height / 2, enemy.width / 8, enemy.color);
+                ctx.restore();
+            });
+
+            // Draw particles
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            });
+            ctx.globalAlpha = 1;
+
+            // Draw level indicator
+            ctx.fillStyle = '#4a4a6a';
+            ctx.font = '12px "Press Start 2P", monospace';
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start game
+        function startGame() {
+            gameRunning = true;
+            score = 0;
+            level = 1;
+            frameCount = 0;
+            enemies = [];
+            particles = [];
+            player.x = 284;
+            player.invincible = false;
+            
+            document.getElementById('scoreDisplay').textContent = '0';
+            document.getElementById('scoreDisplay2').textContent = '0';
+            document.getElementById('levelDisplay').textContent = '1';
+            document.getElementById('levelDisplay2').textContent = '1';
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+        }
+
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            
+            // Create explosion effect
+            createParticles(player.x + player.width / 2, player.y + player.height / 2, player.color, 40);
+            
+            // Update high score
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('pixelDodgeHighScore', highScore);
+                document.getElementById('highScoreDisplay').textContent = highScore;
+            }
+
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalLevel').textContent = level;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        // Start the render loop
+        gameLoop();
+    </script>
+</body>
+</html>
