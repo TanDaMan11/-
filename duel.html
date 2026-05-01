@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DUAL</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#07080f;color:#fff;font-family:'DM Mono',monospace;}
+canvas{position:fixed;inset:0;}
+.screen{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(7,8,15,0.96);transition:opacity .25s;}
+.screen.hide{opacity:0;pointer-events:none;}
+.big-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(72px,14vw,140px);letter-spacing:10px;line-height:.9;text-align:center;}
+.big-title span{display:block;font-family:'DM Mono',monospace;font-size:12px;font-weight:300;letter-spacing:5px;color:rgba(255,255,255,0.2);margin-top:14px;}
+.controls-row{display:flex;gap:44px;margin-top:30px;align-items:center;}
+.ctrl{display:flex;flex-direction:column;align-items:center;gap:7px;}
+.kbd{width:48px;height:48px;border-radius:7px;border:2px solid;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:26px;}
+.kbd.f{border-color:#4af;color:#4af;background:rgba(68,170,255,.07);}
+.kbd.j{border-color:#fa4;color:#fa4;background:rgba(255,170,68,.07);}
+.ctrl-desc{font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.22);text-align:center;line-height:1.8;}
+.level-select-label{font-size:9px;letter-spacing:4px;color:rgba(255,255,255,0.25);text-transform:uppercase;margin-top:28px;}
+.level-grid{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px;max-width:360px;justify-content:center;}
+.lvl-btn{width:52px;height:52px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.3);font-family:'Bebas Neue',sans-serif;font-size:20px;cursor:pointer;transition:all .13s;}
+.lvl-btn:hover{border-color:rgba(255,255,255,0.55);color:#fff;background:rgba(255,255,255,0.05);}
+.lvl-btn.selected{border-color:#4af;color:#4af;background:rgba(68,170,255,.09);box-shadow:0 0 12px rgba(68,170,255,.18);}
+.play-btn{margin-top:24px;background:transparent;border:1.5px solid rgba(255,255,255,0.22);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:5px;padding:12px 48px;border-radius:4px;cursor:pointer;transition:all .13s;}
+.play-btn:hover{background:rgba(255,255,255,0.06);border-color:#fff;}
+.death-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,12vw,105px);letter-spacing:6px;color:#ff3348;text-shadow:0 0 45px rgba(255,51,72,.4);}
+.death-sub{font-size:10px;letter-spacing:4px;color:rgba(255,255,255,0.25);margin-top:9px;text-transform:uppercase;}
+.attempt-n{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:rgba(255,255,255,0.12);margin-top:4px;}
+.win-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,11vw,105px);letter-spacing:6px;text-shadow:0 0 45px rgba(68,170,255,.4);}
+.win-sub{font-size:10px;letter-spacing:5px;color:rgba(255,255,255,0.28);margin-top:7px;}
+/* HUD */
+#hud{position:fixed;top:0;left:0;right:0;z-index:20;pointer-events:none;}
+/* Progress bar at TOP */
+#prog-wrap{height:5px;background:rgba(255,255,255,0.07);width:100%;}
+#prog-bar{height:100%;width:0%;transition:width .1s linear;}
+#hud-row{display:flex;justify-content:space-between;padding:10px 20px;}
+#hud-level{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:3px;color:rgba(255,255,255,0.14);}
+#hud-pct{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:rgba(255,255,255,0.14);}
+#hud-att{font-size:9px;letter-spacing:3px;color:rgba(255,255,255,0.11);text-align:center;text-transform:uppercase;padding-bottom:4px;}
+/* Speed portal flash */
+#speed-flash{position:fixed;inset:0;z-index:15;pointer-events:none;opacity:0;background:rgba(255,255,255,0.12);transition:opacity .08s;}
+/* Key hints */
+#key-hints{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:90px;z-index:20;pointer-events:none;}
+.hk{width:30px;height:30px;border-radius:5px;border:1.5px solid;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:17px;opacity:.28;transition:all .06s;}
+.hk.fk{border-color:#4af;color:#4af;}
+.hk.jk{border-color:#fa4;color:#fa4;}
+.hk.lit{opacity:1;background:rgba(255,255,255,0.1);box-shadow:0 0 9px rgba(255,255,255,.16);}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="prog-wrap"><div id="prog-bar"></div></div>
+  <div id="hud-row">
+    <div id="hud-level">LEVEL 1</div>
+    <div id="hud-pct">0%</div>
+  </div>
+  <div id="hud-att">Attempt 1</div>
+</div>
+<div id="speed-flash"></div>
+<div id="key-hints">
+  <div class="hk fk" id="hkf">F</div>
+  <div class="hk jk" id="hkj">J</div>
+</div>
+<div class="screen" id="scr-start">
+  <div class="big-title">DUAL<span>One dies. Both restart.</span></div>
+  <div class="controls-row">
+    <div class="ctrl"><div class="kbd f">F</div><div class="ctrl-desc">Floor cube<br>jumps UP</div></div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:rgba(255,255,255,0.1)">+</div>
+    <div class="ctrl"><div class="kbd j">J</div><div class="ctrl-desc">Ceiling cube<br>jumps DOWN</div></div>
+  </div>
+  <div class="level-select-label">Select Level</div>
+  <div class="level-grid" id="lvl-grid"></div>
+  <button class="play-btn" onclick="onPlayClick()">PLAY</button>
+</div>
+<div class="screen hide" id="scr-death">
+  <div class="death-title">DEAD</div>
+  <div class="death-sub">Both must survive</div>
+  <div class="attempt-n" id="death-att">Attempt 1</div>
+  <button class="play-btn" style="margin-top:26px" onclick="startLevel()">RETRY</button>
+  <div style="margin-top:10px;font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.1)">or F / J / Space</div>
+</div>
+<div class="screen hide" id="scr-win">
+  <div class="win-title" id="win-title">CLEAR</div>
+  <div class="win-sub" id="win-sub">Level 1 Complete</div>
+  <button class="play-btn" style="margin-top:28px" id="next-btn" onclick="nextLevel()">NEXT LEVEL</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CANVAS
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W=0,H=0,GROUND_Y=0,CEIL_Y=0;
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+  GROUND_Y=H*0.72; CEIL_Y=H*0.28;
+}
+window.addEventListener('resize',resize); resize();
+
+// ═══════════════════════════════════════════════════════
+//  AUDIO ENGINE
+// ═══════════════════════════════════════════════════════
+let ac=null,masterGain=null,analyser=null,freqData=null;
+function ensureAudio(){
+  if(ac)return;
+  ac=new(window.AudioContext||window.webkitAudioContext)();
+  const comp=ac.createDynamicsCompressor();
+  comp.threshold.value=-12;comp.ratio.value=6;
+  masterGain=ac.createGain();masterGain.gain.value=0.52;
+  analyser=ac.createAnalyser();analyser.fftSize=128;
+  freqData=new Uint8Array(analyser.frequencyBinCount);
+  masterGain.connect(comp);comp.connect(analyser);analyser.connect(ac.destination);
+}
+function H2(n){return 261.63*Math.pow(2,(n-60)/12);}// midi→hz
+
+function osc(freq,type,vol,dur,t,detune=0){
+  if(!ac)return;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(masterGain);
+  o.type=type;o.frequency.value=freq;if(detune)o.detune.value=detune;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.start(t);o.stop(t+dur+0.01);
+}
+function kick(t,freq=160,dur=0.18){
+  if(!ac)return;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(masterGain);
+  o.frequency.setValueAtTime(freq,t);
+  o.frequency.exponentialRampToValueAtTime(35,t+0.08);
+  g.gain.setValueAtTime(0.9,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.start(t);o.stop(t+dur+0.01);
+}
+function snare(t,tone=2200,vol=0.35){
+  if(!ac)return;
+  const len=Math.floor(ac.sampleRate*0.1);
+  const buf=ac.createBuffer(1,len,ac.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+  const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();
+  f.type='bandpass';f.frequency.value=tone;f.Q.value=0.8;
+  s.buffer=buf;s.connect(f);f.connect(g);g.connect(masterGain);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+  s.start(t);s.stop(t+0.11);
+}
+function hihat(t,v=0.07,open=false){
+  if(!ac)return;
+  const dur=open?0.12:0.022;
+  const len=Math.floor(ac.sampleRate*dur);
+  const buf=ac.createBuffer(1,len,ac.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+  const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();
+  f.type='highpass';f.frequency.value=open?8000:10000;
+  s.buffer=buf;s.connect(f);f.connect(g);g.connect(masterGain);
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  s.start(t);s.stop(t+dur+0.01);
+}
+function clap(t){
+  if(!ac)return;
+  for(let i=0;i<3;i++){
+    const len=Math.floor(ac.sampleRate*0.04);
+    const buf=ac.createBuffer(1,len,ac.sampleRate);
+    const d=buf.getChannelData(0);for(let j=0;j<len;j++)d[j]=Math.random()*2-1;
+    const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();
+    f.type='bandpass';f.frequency.value=1200;f.Q.value=0.5;
+    s.buffer=buf;s.connect(f);f.connect(g);g.connect(masterGain);
+    g.gain.setValueAtTime(0.2,t+i*0.012);g.gain.exponentialRampToValueAtTime(0.0001,t+i*0.012+0.04);
+    s.start(t+i*0.012);s.stop(t+i*0.012+0.05);
+  }
+}
+// 808-style bass with pitch slide
+function bass808(t,freq,dur){
+  if(!ac)return;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(masterGain);
+  o.type='sine';
+  o.frequency.setValueAtTime(freq*1.5,t);
+  o.frequency.exponentialRampToValueAtTime(freq,t+0.04);
+  g.gain.setValueAtTime(0.55,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.start(t);o.stop(t+dur+0.01);
+}
+function click(t){
+  if(!ac)return;
+  const len=Math.floor(ac.sampleRate*0.012);
+  const buf=ac.createBuffer(1,len,ac.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+  const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();
+  f.type='bandpass';f.frequency.value=2600;f.Q.value=3;
+  s.buffer=buf;s.connect(f);f.connect(g);g.connect(masterGain);
+  g.gain.setValueAtTime(0.6,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.011);
+  s.start(t);s.stop(t+0.013);
+  osc(260,'square',0.18,0.01,t);
+}
+function jumpSfx(isFloor){
+  if(!ac)return;
+  const t=ac.currentTime,f=isFloor?370:490;
+  osc(f,'sine',0.18,0.07,t);osc(f*1.5,'sine',0.05,0.04,t+0.01);
+}
+function deathSfx(){
+  if(!ac)return;
+  const t=ac.currentTime;
+  osc(180,'sawtooth',0.4,0.06,t);osc(120,'sawtooth',0.45,0.11,t+0.04);osc(70,'square',0.28,0.18,t+0.09);
+}
+function winSfx(){
+  if(!ac)return;
+  const t=ac.currentTime;
+  [523,659,784,1047].forEach((f,i)=>osc(f,'sine',0.22,0.14,t+i*0.08));
+}
+
+// ═══════════════════════════════════════════════════════
+//  8 DISTINCT SONGS
+//  Each is a completely different genre/feel/instrumentation
+//  schedFn(beat, beatTime, BEAT) — called per beat, returns void
+//  melFn(step, stepTime, EIGHTH) — called per 8th-note step
+//  Both loop over their own internal patterns
+// ═══════════════════════════════════════════════════════
+
+// Color themes [floorColor, ceilColor, bgColor, accentColor]
+const THEMES=[
+  {fc:'#4af',cc:'#fa4',bg:'#07080f',ac:'rgba(68,170,255,',cc2:'rgba(255,170,68,'},   // lv1 blue/orange
+  {fc:'#f4a',cc:'#4fa',bg:'#080a0f',ac:'rgba(255,80,170,', cc2:'rgba(64,255,128,'},  // lv2 pink/green
+  {fc:'#af4',cc:'#a4f',bg:'#08090c',ac:'rgba(160,255,64,', cc2:'rgba(160,64,255,'},  // lv3 lime/purple
+  {fc:'#fa4',cc:'#4af',bg:'#0d0808',ac:'rgba(255,160,40,', cc2:'rgba(64,160,255,'},  // lv4 orange/blue (swapped)
+  {fc:'#0ef',cc:'#f50',bg:'#07090d',ac:'rgba(0,230,255,',  cc2:'rgba(255,80,0,'},    // lv5 cyan/red
+  {fc:'#8f4',cc:'#f48',bg:'#080d08',ac:'rgba(128,255,64,', cc2:'rgba(255,64,128,'},  // lv6 green/pink
+  {fc:'#f8f',cc:'#ff8',bg:'#0d080d',ac:'rgba(255,128,255,',cc2:'rgba(255,255,64,'},  // lv7 magenta/yellow
+  {fc:'#fff',cc:'#f44',bg:'#0a0808',ac:'rgba(255,255,255,',cc2:'rgba(255,64,64,'},   // lv8 white/red
+];
+let theme=THEMES[0];
+
+// ── SONG 1: "Stereo Drive" — punchy rock-inspired, power chords, driving 8ths
+// Am - G - F - G, 4/4, 92bpm, distorted square bass, simple snare on 2&4
+const S1_BASS=[57,55,53,55];// A2 G2 F2 G2
+const S1_MEL=[
+  {s:0,m:69},{s:2,m:72},{s:4,m:76},{s:5,m:74},
+  {s:7,m:72},{s:8,m:74},{s:10,m:72},{s:12,m:69},
+  {s:14,m:67},{s:16,m:69},{s:18,m:72},{s:20,m:76},
+  {s:22,m:79},{s:24,m:77},{s:26,m:76},{s:28,m:74},
+  {s:29,m:72},{s:31,m:71}
+];
+function song1beat(b,t,BEAT){
+  const bm=b%4;
+  if(bm===0||bm===2)kick(t,150,0.2);
+  if(bm===1||bm===3)snare(t,2000,0.4);
+  hihat(t,0.06);hihat(t+BEAT*0.5,0.04);
+  // power chord stab on beat 1 of each bar
+  if(bm===0){
+    const root=H2(S1_BASS[Math.floor(b/4)%4]);
+    osc(root,'sawtooth',0.13,BEAT*0.4,t);
+    osc(root*1.5,'sawtooth',0.08,BEAT*0.4,t);
+  }
+}
+function song1mel(s,t,E){
+  const n=S1_MEL.find(x=>x.s===s%32);
+  if(n)osc(H2(n.m),'square',0.09,E*0.55,t);
+}
+
+// ── SONG 2: "Bossa Drop" — bossa nova rhythm, acoustic-style plucks, 3+3+2 feel
+// Dm7 - G7 - Cmaj7 - A7, 88bpm
+const S2_BASS=[50,43,48,45];// D2 G1 C2 A1
+const S2_CHORDS=[[50,53,57,60],[43,47,50,53],[48,52,55,59],[45,49,52,57]];
+const S2_RHYTHM=[1,0,0,1,0,1,0,0,1,0,1,0,1,0,0,1];// bass rhythm 16th pattern
+const S2_MEL=[
+  {s:0,m:74},{s:3,m:77},{s:5,m:76},{s:7,m:74},
+  {s:9,m:72},{s:11,m:70},{s:13,m:72},
+  {s:16,m:74},{s:19,m:77},{s:21,m:79},{s:23,m:77},
+  {s:25,m:76},{s:27,m:74},{s:29,m:72},{s:31,m:70}
+];
+function song2beat(b,t,BEAT){
+  const bm=b%4,SIX=BEAT/4;
+  // Bossa kick: beat 1 and "and" of 2
+  if(bm===0)kick(t,140,0.16);
+  if(bm===1)kick(t+BEAT*0.5,140,0.14);
+  // Rim instead of snare
+  if(bm===2)snare(t,3500,0.18);
+  if(bm===3)snare(t,3500,0.15);
+  // Syncopated hihat 3+3+2
+  [0,3,6,9,11,13].forEach(off=>hihat(t+off*SIX,0.05));
+  // Chord stab every 4 beats (1 bar)
+  if(bm===0){
+    const bar=Math.floor(b/4)%4;
+    S2_CHORDS[bar].forEach((m,i)=>{
+      osc(H2(m),'triangle',0.06,BEAT*1.8,t+i*0.02);
+    });
+  }
+  // Bass on 16th-note pattern
+  const root=H2(S2_BASS[Math.floor(b/4)%4]);
+  if(S2_RHYTHM[bm*4])osc(root,'triangle',0.2,BEAT*0.3,t);
+  if(S2_RHYTHM[bm*4+2])osc(root,'triangle',0.15,BEAT*0.25,t+BEAT*0.5);
+}
+function song2mel(s,t,E){
+  const n=S2_MEL.find(x=>x.s===s%32);
+  if(n){
+    osc(H2(n.m),'sine',0.12,E*0.7,t);
+    osc(H2(n.m-12),'sine',0.05,E*0.5,t+0.01);
+  }
+}
+
+// ── SONG 3: "Trap Glow" — lo-fi trap, 808 bass, rolling hi-hats, sparse snare
+// C#m - A - E - B, 78bpm (slow but hi-hats are 32nd rolls)
+const S3_BASS=[37,33,28,35];// C#1 A0 E0 B0
+const S3_MEL=[
+  {s:0,m:73},{s:4,m:76},{s:6,m:78},{s:8,m:76},
+  {s:11,m:73},{s:13,m:71},
+  {s:16,m:73},{s:20,m:76},{s:22,m:80},{s:24,m:78},
+  {s:26,m:76},{s:28,m:73},{s:30,m:71}
+];
+const S3_KICK=[1,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0];
+const S3_SNARE=[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0];
+function song3beat(b,t,BEAT){
+  const bm=b%4,SIX=BEAT/4;
+  if(S3_KICK[bm*4])kick(t,180,0.22);
+  if(S3_KICK[bm*4+2])kick(t+BEAT*0.5,160,0.18);
+  if(S3_SNARE[bm*4])clap(t);
+  if(S3_SNARE[bm*4+2])clap(t+BEAT*0.5);
+  // Rolling hi-hats (8 per beat = 32nd notes)
+  for(let i=0;i<8;i++){
+    const vol=i%2===0?0.055:0.025+(Math.random()*0.02);
+    hihat(t+i*SIX/2,vol,i===6);
+  }
+  // 808 bass on beat 1 of bar
+  if(bm===0){
+    const root=H2(S3_BASS[Math.floor(b/4)%4]);
+    bass808(t,root,BEAT*3.5);
+  }
+}
+function song3mel(s,t,E){
+  const n=S3_MEL.find(x=>x.s===s%32);
+  if(n)osc(H2(n.m),'sine',0.1,E*0.85,t);
+}
+
+// ── SONG 4: "Funk Pocket" — 16th-note funk bass pops, clav stabs, tight groove
+// Em7 - A7 - Dm7 - G7, 96bpm, very rhythmic bass pattern
+const S4_BASS=[52,57,50,55];
+const S4_BASSGRID=[1,0,1,0,0,1,0,1,1,0,0,1,0,1,0,0];// 16th note bass hits
+const S4_MEL=[
+  {s:1,m:76},{s:2,m:79},{s:4,m:81},{s:6,m:79},
+  {s:7,m:76},{s:9,m:74},{s:10,m:72},
+  {s:13,m:74},{s:14,m:76},{s:16,m:79},
+  {s:18,m:81},{s:20,m:84},{s:22,m:81},
+  {s:24,m:79},{s:26,m:76},{s:28,m:74},{s:30,m:72}
+];
+function song4beat(b,t,BEAT){
+  const bm=b%4,SIX=BEAT/4;
+  // Tight kick pattern
+  if(bm===0)kick(t,155,0.14);
+  if(bm===2)kick(t,145,0.12);
+  if(bm===1||bm===3)snare(t,2400,0.32);
+  // 16th note hihats, ghost notes
+  for(let i=0;i<4;i++){
+    hihat(t+i*SIX,i%2===0?0.065:0.03);
+  }
+  // Funky 16th bass pops
+  const root=H2(S4_BASS[Math.floor(b/4)%4]-12);
+  for(let i=0;i<4;i++){
+    if(S4_BASSGRID[bm*4+i]){
+      osc(root,'sawtooth',0.22,SIX*0.6,t+i*SIX);
+    }
+  }
+  // Clav-style stab on off-beats
+  if(bm===0)osc(H2(S4_BASS[Math.floor(b/4)%4]+7),'square',0.07,SIX*0.4,t+SIX);
+  if(bm===2)osc(H2(S4_BASS[Math.floor(b/4)%4]+4),'square',0.06,SIX*0.4,t+SIX*1.5);
+}
+function song4mel(s,t,E){
+  const n=S4_MEL.find(x=>x.s===s%32);
+  if(n)osc(H2(n.m),'square',0.07,E*0.5,t);
+}
+
+// ── SONG 5: "Arcade Rush" — fast 8-bit style, arpeggio chords, driving energy
+// C - F - Am - G, 108bpm, fast arpeggios, square waves
+const S5_ARP=[48,52,55,60,  53,57,60,65,  57,60,64,69,  55,59,62,67];// C F Am G arpeggios
+const S5_MEL=[
+  {s:0,m:72},{s:1,m:76},{s:2,m:79},{s:3,m:76},
+  {s:4,m:77},{s:5,m:81},{s:6,m:79},{s:7,m:77},
+  {s:8,m:76},{s:9,m:72},{s:10,m:76},{s:11,m:79},
+  {s:12,m:81},{s:13,m:84},{s:14,m:81},{s:15,m:79},
+  {s:16,m:77},{s:17,m:76},{s:18,m:74},{s:19,m:72},
+  {s:20,m:74},{s:21,m:76},{s:22,m:77},{s:23,m:79},
+  {s:24,m:81},{s:25,m:79},{s:26,m:77},{s:27,m:76},
+  {s:28,m:74},{s:29,m:72},{s:30,m:71},{s:31,m:69}
+];
+function song5beat(b,t,BEAT){
+  const bm=b%4;
+  kick(t,140,0.15);
+  if(bm===1||bm===3)snare(t,2100,0.3);
+  // Fast 16th hihats every beat
+  for(let i=0;i<4;i++)hihat(t+i*BEAT/4,i%2===0?0.07:0.04);
+  // Arpeggios: 8 notes per beat
+  const bar=Math.floor(b/4)%4;
+  const arpNotes=S5_ARP.slice(bar*4,(bar+1)*4);
+  for(let i=0;i<4;i++){
+    osc(H2(arpNotes[i%4]),'square',0.05,BEAT*0.2,t+i*BEAT/4);
+    osc(H2(arpNotes[i%4]-12),'square',0.04,BEAT*0.18,t+i*BEAT/4+BEAT/8);
+  }
+}
+function song5mel(s,t,E){
+  const n=S5_MEL.find(x=>x.s===s%32);
+  if(n){
+    osc(H2(n.m),'square',0.085,E*0.45,t);
+    osc(H2(n.m+7),'square',0.03,E*0.35,t+0.01);
+  }
+}
+
+// ── SONG 6: "Neon Cathedral" — ambient pad wash, minimal drums, dreamy arpeggio
+// Fm - Db - Ab - Eb, 84bpm, long pad sustains, sparse kick only on 1
+const S6_PADS=[[53,56,60,63],[49,53,56,60],[44,48,51,55],[39,43,46,51]];
+const S6_ARP=[53,56,60,63,65,63,60,56,  49,53,56,60,63,60,56,53];
+const S6_MEL=[
+  {s:0,m:65},{s:4,m:68},{s:8,m:72},{s:10,m:70},
+  {s:12,m:68},{s:14,m:65},{s:16,m:63},
+  {s:20,m:65},{s:24,m:68},{s:26,m:72},
+  {s:28,m:70},{s:30,m:68}
+];
+function song6beat(b,t,BEAT){
+  const bm=b%4;
+  if(bm===0)kick(t,120,0.25);// single soft kick on 1 only
+  if(bm===2)hihat(t,0.04,true);// open hihat on 3
+  hihat(t+BEAT*0.5,0.03);
+  // Pad: long sustain, changes every bar
+  if(bm===0){
+    const bar=Math.floor(b/4)%4;
+    S6_PADS[bar].forEach((m,i)=>{
+      osc(H2(m),'sine',0.08,BEAT*4.5,t+i*0.04);
+    });
+  }
+  // Arpeggio runs through 16 notes per 2 bars
+  const arpIdx=(b*4)%16;
+  for(let i=0;i<4;i++){
+    osc(H2(S6_ARP[(arpIdx+i)%16]),'sine',0.05,BEAT*0.3,t+i*BEAT/4);
+  }
+}
+function song6mel(s,t,E){
+  const n=S6_MEL.find(x=>x.s===s%32);
+  if(n)osc(H2(n.m),'sine',0.11,E*1.2,t);
+}
+
+// ── SONG 7: "Breakbeat Fury" — chopped breakbeat, urgent, double-time hi-hats
+// Gm - Eb - Bb - F, 110bpm, choppy kick pattern, rapid melody runs
+const S7_KICK=[1,0,0,1,0,0,1,0,0,0,1,0,0,1,0,0];
+const S7_SNARE=[0,0,0,0,1,0,0,1,0,0,0,0,1,0,1,0];
+const S7_BASS=[43,39,34,41];
+const S7_MEL=[
+  {s:0,m:79},{s:1,m:82},{s:2,m:84},{s:3,m:82},
+  {s:4,m:79},{s:5,m:77},{s:6,m:75},{s:7,m:77},
+  {s:8,m:79},{s:9,m:82},{s:10,m:86},{s:11,m:84},
+  {s:12,m:82},{s:13,m:79},{s:14,m:77},
+  {s:16,m:75},{s:17,m:77},{s:18,m:79},{s:19,m:82},
+  {s:20,m:84},{s:21,m:82},{s:22,m:79},{s:23,m:77},
+  {s:24,m:75},{s:25,m:77},{s:26,m:79},{s:27,m:82},
+  {s:28,m:84},{s:29,m:87},{s:30,m:84},{s:31,m:82}
+];
+function song7beat(b,t,BEAT){
+  const bm=b%4,SIX=BEAT/4;
+  // Chopped kick/snare from pattern
+  for(let i=0;i<4;i++){
+    if(S7_KICK[bm*4+i])kick(t+i*SIX,145,0.13);
+    if(S7_SNARE[bm*4+i])snare(t+i*SIX,2300,0.28);
+  }
+  // Double-time hi-hats (8th notes with accents)
+  for(let i=0;i<8;i++)hihat(t+i*SIX/2,i%4===0?0.07:0.03);
+  // Bass hit on beat
+  osc(H2(S7_BASS[Math.floor(b/4)%4]-12),'sawtooth',0.18,BEAT*0.4,t);
+}
+function song7mel(s,t,E){
+  const n=S7_MEL.find(x=>x.s===s%32);
+  if(n){
+    osc(H2(n.m),'square',0.075,E*0.38,t);
+    if(s%4===0)osc(H2(n.m-12),'sawtooth',0.06,E*0.5,t);
+  }
+}
+
+// ── SONG 8: "Final Surge" — full arrangement, counter-melody, dubstep-tinged bass wobble
+// Bm - G - D - A, 122bpm, everything layered, most intense
+const S8_BASS=[47,43,38,45];
+const S8_CHORD=[[47,50,54],[43,47,50],[38,42,45],[45,49,52]];
+const S8_MEL=[
+  {s:0,m:74},{s:1,m:78},{s:2,m:81},{s:3,m:83},
+  {s:4,m:81},{s:5,m:78},{s:6,m:74},{s:7,m:71},
+  {s:8,m:74},{s:9,m:78},{s:10,m:83},{s:11,m:86},
+  {s:12,m:83},{s:13,m:81},{s:14,m:78},{s:15,m:74},
+  {s:16,m:71},{s:17,m:74},{s:18,m:78},{s:19,m:81},
+  {s:20,m:83},{s:21,m:81},{s:22,m:78},{s:23,m:74},
+  {s:24,m:71},{s:25,m:74},{s:26,m:78},{s:27,m:83},
+  {s:28,m:86},{s:29,m:83},{s:30,m:78},{s:31,m:74}
+];
+// Counter-melody (lower harmony)
+const S8_CTR=[
+  {s:2,m:66},{s:6,m:62},{s:10,m:66},{s:14,m:69},
+  {s:18,m:66},{s:22,m:62},{s:26,m:66},{s:30,m:69}
+];
+function song8beat(b,t,BEAT){
+  const bm=b%4,SIX=BEAT/4;
+  kick(t,170,0.17);if(bm===2)kick(t+BEAT*0.25,150,0.12);
+  if(bm===1||bm===3)snare(t,2000,0.38);
+  for(let i=0;i<4;i++)hihat(t+i*SIX,i%2===0?0.065:0.04);
+  hihat(t+BEAT*0.5,0.055,true);
+  const bar=Math.floor(b/4)%4;
+  // Wobble bass: modulate frequency
+  const root=H2(S8_BASS[bar]-12);
+  const wobRate=bm%2===0?2:4;
+  for(let i=0;i<wobRate;i++){
+    osc(root*(1+i*0.05),'sawtooth',0.14/wobRate,BEAT/wobRate,t+i*BEAT/wobRate);
+  }
+  // Power chord stabs on 1 and 3
+  if(bm===0||bm===2){
+    S8_CHORD[bar].forEach((m,i)=>osc(H2(m),'sawtooth',0.07,BEAT*0.35,t+i*0.015));
+  }
+}
+function song8mel(s,t,E){
+  const n=S8_MEL.find(x=>x.s===s%32);
+  if(n){osc(H2(n.m),'square',0.07,E*0.4,t);osc(H2(n.m+12),'square',0.025,E*0.3,t+0.005);}
+  const c=S8_CTR.find(x=>x.s===s%32);
+  if(c)osc(H2(c.m),'triangle',0.055,E*0.55,t);
+}
+
+const SONGS=[
+  {bpm:92, swing:0.0,  beatFn:song1beat, melFn:song1mel, name:'Stereo Drive'},
+  {bpm:88, swing:0.08, beatFn:song2beat, melFn:song2mel, name:'Bossa Drop'},
+  {bpm:78, swing:0.04, beatFn:song3beat, melFn:song3mel, name:'Trap Glow'},
+  {bpm:96, swing:0.05, beatFn:song4beat, melFn:song4mel, name:'Funk Pocket'},
+  {bpm:108,swing:0.0,  beatFn:song5beat, melFn:song5mel, name:'Arcade Rush'},
+  {bpm:84, swing:0.06, beatFn:song6beat, melFn:song6mel, name:'Neon Cathedral'},
+  {bpm:110,swing:0.02, beatFn:song7beat, melFn:song7mel, name:'Breakbeat Fury'},
+  {bpm:122,swing:0.0,  beatFn:song8beat, melFn:song8mel, name:'Final Surge'}
+];
+
+let musicStart=0,scheduledTo=0;
+const AHEAD=0.3;
+let curSong=SONGS[0];
+let clickBeats=new Set();
+
+function scheduleMusic(){
+  if(!ac||!masterGain||!running)return;
+  const now=ac.currentTime,upTo=now+AHEAD;
+  if(upTo<=scheduledTo)return;
+  const BEAT=60/curSong.bpm;
+  const EIGHTH=BEAT*0.5;
+  const swing=curSong.swing;
+  const b0=Math.max(0,(scheduledTo-musicStart)/BEAT);
+  const b1=(upTo-musicStart)/BEAT;
+  // beats
+  for(let b=Math.floor(b0);b<=Math.ceil(b1)+1;b++){
+    const t=musicStart+b*BEAT;
+    if(t<scheduledTo-0.001||t>upTo+0.001)continue;
+    curSong.beatFn(b,t,BEAT);
+    if(clickBeats.has(b))click(t);
+  }
+  // 8th-note melody steps
+  const s0=Math.floor(b0*2),s1=Math.ceil(b1*2)+2;
+  for(let s=s0;s<=s1;s++){
+    const baseT=musicStart+s*EIGHTH;
+    const swingT=baseT+(s%2===1?EIGHTH*swing:0);
+    if(swingT<scheduledTo-0.001||swingT>upTo+0.001)continue;
+    curSong.melFn(s,swingT,EIGHTH);
+  }
+  scheduledTo=upTo;
+}
+
+// ═══════════════════════════════════════════════════════
+//  GAME CONSTANTS
+// ═══════════════════════════════════════════════════════
+const CUBE_SZ=30;
+const CUBE_X=120;
+const BASE_SPEED=280;
+const SPIKE_W=30,SPIKE_H=24;
+const GRAVITY=1600;
+const JUMP_VEL=620;
+const JUMP_ADVANCE=0.75;
+const PLAT_H=12;   // platform bar thickness
+const GAP_BEATS=0.85; // gap width in beats — bigger holes
+
+// ═══════════════════════════════════════════════════════
+//  LEVEL DATA
+//  seg types: 's'=spike  'g'=gap  'p'=platform
+//  platform: l='f' floor cube hits underside and sticks (gravity flips)
+//            l='c' ceil cube hits top and sticks (gravity flips)
+//            y = height fraction 0..1 from floor
+// ═══════════════════════════════════════════════════════
+const LEVELS=[
+  // LV1 — Stereo Drive — 120 beats
+  {name:'1',beats:120,segs:[
+    // intro — simple alternating
+    {b:4,t:'s',l:'f'},{b:6,t:'s',l:'c'},{b:8,t:'s',l:'f'},{b:10,t:'s',l:'c'},
+    {b:13,t:'g',l:'f'},{b:16,t:'s',l:'c'},{b:18,t:'s',l:'f'},
+    {b:20,t:'s',l:'c'},{b:22,t:'s',l:'f'},{b:25,t:'g',l:'c'},
+    {b:27,t:'s',l:'f'},{b:29,t:'s',l:'c'},
+    // mid — platforms intro
+    {b:32,t:'p',l:'f',y:0.38},{b:36,t:'s',l:'c'},
+    {b:38,t:'s',l:'f'},{b:40,t:'s',l:'b'},
+    {b:43,t:'g',l:'f'},{b:45,t:'p',l:'c',y:0.62},
+    {b:48,t:'s',l:'f'},{b:50,t:'s',l:'b'},
+    {b:52,t:'g',l:'c'},{b:55,t:'s',l:'f'},
+    // drop — speed up
+    {b:60,t:'s',l:'f'},{b:61,t:'s',l:'c'},{b:63,t:'s',l:'b'},
+    {b:65,t:'g',l:'f'},{b:67,t:'s',l:'c'},{b:69,t:'s',l:'b'},
+    {b:71,t:'g',l:'c'},{b:73,t:'s',l:'f'},{b:75,t:'p',l:'f',y:0.4},
+    {b:78,t:'s',l:'c'},{b:80,t:'g',l:'f'},{b:82,t:'s',l:'b'},
+    {b:85,t:'g',l:'b'},{b:87,t:'s',l:'c'},{b:89,t:'s',l:'f'},
+    {b:92,t:'p',l:'c',y:0.6},{b:95,t:'g',l:'f'},
+    {b:97,t:'s',l:'b'},{b:99,t:'s',l:'c'},
+    {b:101,t:'g',l:'f'},{b:103,t:'s',l:'b'},
+    {b:106,t:'s',l:'f'},{b:108,t:'s',l:'c'},{b:110,t:'s',l:'b'},
+    {b:113,t:'g',l:'f'},{b:115,t:'s',l:'c'},{b:117,t:'s',l:'b'}
+  ],portals:[{beat:58,factor:1.5,dur:54,label:'2x'}]},
+
+  // LV2 — Bossa Drop — 124 beats
+  {name:'2',beats:124,segs:[
+    {b:3,t:'s',l:'f'},{b:5,t:'s',l:'c'},{b:7,t:'s',l:'f'},{b:9,t:'s',l:'c'},
+    {b:11,t:'g',l:'f'},{b:14,t:'s',l:'c'},{b:16,t:'s',l:'f'},{b:17,t:'s',l:'c'},
+    {b:19,t:'s',l:'b'},{b:22,t:'g',l:'c'},{b:25,t:'s',l:'f'},{b:26,t:'s',l:'c'},
+    // first orb!
+    {b:31,t:'s',l:'c'},
+    {b:33,t:'p',l:'f',y:0.35},{b:36,t:'s',l:'b'},
+    {b:38,t:'g',l:'c'},{b:40,t:'s',l:'f'},{b:42,t:'s',l:'c'},
+    {b:44,t:'p',l:'c',y:0.65},{b:47,t:'g',l:'f'},
+    {b:49,t:'s',l:'b'},{b:51,t:'s',l:'f'},{b:53,t:'g',l:'c'},
+    {b:56,t:'s',l:'b'},
+    // drop
+    {b:60,t:'s',l:'f'},{b:61,t:'s',l:'c'},{b:63,t:'s',l:'f'},{b:64,t:'s',l:'c'},
+    {b:66,t:'g',l:'f'},{b:68,t:'s',l:'b'},{b:70,t:'g',l:'c'},
+    {b:72,t:'s',l:'f'},{b:73,t:'s',l:'c'},{b:77,t:'g',l:'b'},{b:79,t:'s',l:'f'},{b:81,t:'p',l:'f',y:0.4},
+    {b:84,t:'s',l:'c'},{b:86,t:'g',l:'f'},{b:88,t:'s',l:'b'},
+    {b:91,t:'g',l:'c'},{b:93,t:'s',l:'f'},{b:95,t:'s',l:'c'},
+    {b:97,t:'g',l:'f'},{b:99,t:'s',l:'b'},
+    {b:102,t:'p',l:'c',y:0.6},{b:105,t:'s',l:'b'},
+    {b:107,t:'g',l:'f'},{b:109,t:'s',l:'c'},{b:111,t:'g',l:'c'},
+    {b:113,t:'s',l:'b'},{b:118,t:'g',l:'f'},{b:120,t:'s',l:'b'},{b:122,t:'s',l:'c'}
+  ],portals:[{beat:58,factor:1.5,dur:58,label:'2x'}]},
+
+  // LV3 — Trap Glow — 126 beats
+  {name:'3',beats:126,segs:[
+    {b:3,t:'s',l:'f'},{b:5,t:'s',l:'c'},{b:7,t:'s',l:'f'},{b:9,t:'s',l:'c'},
+    {b:11,t:'g',l:'f'},{b:13,t:'s',l:'c'},{b:14,t:'s',l:'f'},{b:16,t:'s',l:'b'},
+    {b:18,t:'g',l:'c'},{b:23,t:'s',l:'f'},{b:25,t:'s',l:'b'},
+    {b:27,t:'p',l:'f',y:0.35},{b:29,t:'s',l:'c'},
+    {b:31,t:'g',l:'f'},{b:33,t:'s',l:'c'},{b:35,t:'s',l:'b'},
+    {b:37,t:'p',l:'c',y:0.65},{b:40,t:'g',l:'c'},
+    {b:42,t:'s',l:'f'},{b:44,t:'s',l:'b'},
+    {b:49,t:'g',l:'f'},
+    {b:51,t:'s',l:'b'},{b:53,t:'s',l:'c'},{b:55,t:'g',l:'b'},
+    // drop
+    {b:60,t:'s',l:'f'},{b:61,t:'s',l:'c'},{b:62,t:'s',l:'f'},{b:63,t:'s',l:'c'},
+    {b:65,t:'g',l:'f'},{b:67,t:'s',l:'b'},{b:70,t:'g',l:'c'},{b:72,t:'s',l:'f'},{b:73,t:'s',l:'c'},
+    {b:75,t:'s',l:'b'},{b:77,t:'g',l:'b'},
+    {b:80,t:'p',l:'f',y:0.38},{b:83,t:'s',l:'c'},
+    {b:85,t:'g',l:'f'},{b:87,t:'s',l:'b'},{b:91,t:'g',l:'c'},{b:93,t:'s',l:'b'},
+    {b:95,t:'p',l:'c',y:0.62},{b:98,t:'g',l:'f'},
+    {b:100,t:'s',l:'b'},{b:102,t:'s',l:'f'},{b:104,t:'s',l:'c'},
+    {b:106,t:'g',l:'b'},{b:109,t:'s',l:'f'},{b:112,t:'s',l:'c'},{b:114,t:'g',l:'f'},
+    {b:117,t:'s',l:'b'},{b:119,t:'s',l:'c'},
+    {b:121,t:'g',l:'c'},{b:123,t:'s',l:'b'}
+  ],portals:[{beat:58,factor:1.5,dur:60,label:'2x'}]},
+
+  // LV4 — Funk Pocket — 128 beats
+  {name:'4',beats:128,segs:[
+    {b:2,t:'s',l:'f'},{b:4,t:'s',l:'c'},{b:6,t:'s',l:'f'},{b:7,t:'s',l:'c'},
+    {b:9,t:'g',l:'f'},{b:11,t:'s',l:'c'},{b:12,t:'s',l:'f'},{b:14,t:'s',l:'b'},
+    {b:16,t:'p',l:'c',y:0.65},{b:18,t:'g',l:'c'},
+    {b:20,t:'s',l:'f'},{b:21,t:'s',l:'c'},{b:23,t:'s',l:'f'},
+    {b:28,t:'g',l:'b'},{b:30,t:'s',l:'c'},
+    {b:32,t:'p',l:'f',y:0.36},{b:35,t:'s',l:'b'},
+    {b:37,t:'g',l:'c'},{b:39,t:'s',l:'f'},{b:43,t:'g',l:'f'},{b:45,t:'s',l:'b'},
+    {b:47,t:'p',l:'c',y:0.62},{b:50,t:'g',l:'b'},
+    {b:52,t:'s',l:'f'},{b:54,t:'s',l:'c'},{b:55,t:'g',l:'f'},
+    // drop
+    {b:60,t:'s',l:'f'},{b:61,t:'s',l:'c'},{b:62,t:'s',l:'f'},{b:63,t:'s',l:'c'},
+    {b:65,t:'g',l:'f'},{b:66,t:'s',l:'b'},{b:70,t:'g',l:'c'},{b:71,t:'s',l:'f'},{b:72,t:'s',l:'c'},
+    {b:74,t:'s',l:'b'},{b:76,t:'g',l:'b'},
+    {b:78,t:'p',l:'f',y:0.4},{b:81,t:'s',l:'c'},
+    {b:83,t:'g',l:'f'},{b:85,t:'s',l:'b'},{b:89,t:'g',l:'c'},{b:91,t:'s',l:'b'},
+    {b:93,t:'p',l:'c',y:0.6},{b:96,t:'g',l:'f'},
+    {b:98,t:'s',l:'b'},{b:100,t:'s',l:'f'},{b:101,t:'s',l:'c'},
+    {b:103,t:'g',l:'b'},{b:108,t:'s',l:'c'},{b:110,t:'g',l:'f'},
+    {b:112,t:'s',l:'b'},{b:114,t:'s',l:'c'},
+    {b:116,t:'g',l:'c'},{b:118,t:'p',l:'f',y:0.38},
+    {b:121,t:'s',l:'b'},{b:123,t:'g',l:'f'},
+    {b:125,t:'s',l:'b'},{b:127,t:'s',l:'c'}
+  ],portals:[{beat:58,factor:1.55,dur:62,label:'2x'}],
+  rotPortals:[{beat:38,dur:10,dir:1},{beat:85,dur:10,dir:-1}]},
+  {name:'5',beats:130,segs:[
+    {b:2,t:'s',l:'f'},{b:3,t:'s',l:'c'},{b:5,t:'s',l:'b'},
+    {b:7,t:'g',l:'f'},{b:9,t:'s',l:'c'},{b:10,t:'s',l:'f'},{b:12,t:'s',l:'c'},
+    {b:13,t:'s',l:'f'},{b:15,t:'g',l:'c'},{b:20,t:'s',l:'b'},{b:22,t:'p',l:'c',y:0.65},
+    {b:24,t:'s',l:'f'},{b:25,t:'s',l:'c'},{b:27,t:'g',l:'f'},
+    {b:29,t:'s',l:'b'},{b:33,t:'g',l:'b'},
+    {b:35,t:'p',l:'f',y:0.37},{b:38,t:'s',l:'c'},
+    {b:40,t:'g',l:'f'},{b:42,t:'s',l:'b'},
+    {b:47,t:'g',l:'c'},
+    {b:49,t:'s',l:'b'},{b:51,t:'p',l:'c',y:0.63},
+    {b:54,t:'s',l:'f'},{b:56,t:'g',l:'b'},
+    // drop
+    {b:60,t:'s',l:'f'},{b:61,t:'s',l:'c'},{b:62,t:'s',l:'b'},
+    {b:64,t:'g',l:'f'},{b:65,t:'s',l:'c'},{b:66,t:'s',l:'f'},
+    {b:68,t:'g',l:'c'},{b:69,t:'s',l:'b'},{b:73,t:'g',l:'f'},{b:74,t:'s',l:'c'},{b:75,t:'s',l:'f'},
+    {b:77,t:'s',l:'b'},{b:79,t:'g',l:'b'},
+    {b:81,t:'p',l:'f',y:0.4},{b:84,t:'s',l:'c'},
+    {b:86,t:'g',l:'f'},{b:90,t:'g',l:'c'},{b:93,t:'s',l:'b'},
+    {b:95,t:'p',l:'c',y:0.6},{b:98,t:'g',l:'f'},
+    {b:100,t:'s',l:'b'},{b:102,t:'s',l:'c'},{b:106,t:'g',l:'b'},{b:108,t:'s',l:'f'},
+    {b:110,t:'s',l:'c'},{b:112,t:'g',l:'c'},
+    {b:114,t:'s',l:'b'},{b:119,t:'g',l:'f'},{b:121,t:'s',l:'b'},
+    {b:123,t:'s',l:'f'},{b:124,t:'s',l:'c'},
+    {b:126,t:'g',l:'b'},{b:128,t:'s',l:'b'}
+  ],portals:[{beat:58,factor:1.6,dur:64,label:'2x'}],
+  rotPortals:[{beat:40,dur:10,dir:1},{beat:90,dur:10,dir:-1}]},
+  {name:'6',beats:132,segs:[
+    {b:2,t:'s',l:'f'},{b:4,t:'s',l:'c'},{b:6,t:'s',l:'f'},{b:8,t:'g',l:'c'},
+    {b:10,t:'s',l:'f'},{b:11,t:'s',l:'c'},{b:13,t:'s',l:'b'},{b:15,t:'g',l:'f'},
+    {b:20,t:'s',l:'c'},{b:22,t:'p',l:'f',y:0.36},
+    {b:25,t:'s',l:'b'},{b:27,t:'g',l:'b'},
+    {b:29,t:'s',l:'f'},{b:31,t:'s',l:'c'},{b:35,t:'g',l:'f'},{b:37,t:'p',l:'c',y:0.64},
+    {b:40,t:'s',l:'b'},{b:42,t:'g',l:'c'},
+    {b:44,t:'s',l:'f'},{b:48,t:'g',l:'b'},
+    {b:50,t:'s',l:'c'},{b:52,t:'p',l:'f',y:0.4},
+    {b:55,t:'s',l:'b'},{b:57,t:'g',l:'f'},
+    // drop
+    {b:62,t:'s',l:'f'},{b:63,t:'s',l:'c'},{b:64,t:'s',l:'f'},{b:65,t:'s',l:'c'},
+    {b:67,t:'g',l:'f'},{b:68,t:'s',l:'b'},{b:72,t:'g',l:'b'},{b:74,t:'s',l:'f'},{b:75,t:'s',l:'c'},
+    {b:77,t:'s',l:'b'},{b:79,t:'g',l:'f'},
+    {b:81,t:'p',l:'c',y:0.62},{b:86,t:'g',l:'c'},{b:88,t:'s',l:'b'},
+    {b:90,t:'s',l:'f'},{b:92,t:'s',l:'c'},{b:94,t:'g',l:'b'},
+    {b:99,t:'s',l:'b'},
+    {b:101,t:'p',l:'f',y:0.38},{b:104,t:'g',l:'f'},
+    {b:106,t:'s',l:'b'},{b:108,t:'s',l:'c'},{b:109,t:'g',l:'c'},
+    {b:111,t:'s',l:'b'},{b:116,t:'g',l:'b'},{b:118,t:'s',l:'f'},
+    {b:120,t:'s',l:'c'},{b:122,t:'g',l:'f'},
+    {b:124,t:'s',l:'b'},{b:129,t:'g',l:'b'},{b:131,t:'s',l:'b'}
+  ],portals:[{beat:60,factor:1.6,dur:64,label:'2x'}],
+  rotPortals:[{beat:45,dur:12,dir:-1},{beat:95,dur:12,dir:1}]},
+  {name:'7',beats:134,segs:[
+    {b:2,t:'s',l:'f'},{b:3,t:'s',l:'c'},{b:4,t:'s',l:'f'},{b:5,t:'s',l:'c'},
+    {b:7,t:'g',l:'f'},{b:9,t:'s',l:'c'},{b:10,t:'s',l:'f'},{b:11,t:'s',l:'c'},
+    {b:13,t:'g',l:'b'},{b:17,t:'s',l:'c'},{b:18,t:'s',l:'b'},
+    {b:20,t:'p',l:'f',y:0.37},{b:22,t:'g',l:'f'},
+    {b:24,t:'s',l:'b'},{b:28,t:'g',l:'c'},{b:30,t:'s',l:'f'},{b:31,t:'s',l:'c'},
+    {b:33,t:'p',l:'c',y:0.63},{b:35,t:'g',l:'b'},
+    {b:40,t:'s',l:'b'},
+    {b:42,t:'g',l:'f'},{b:44,t:'s',l:'c'},
+    {b:46,t:'p',l:'f',y:0.4},{b:51,t:'g',l:'b'},{b:53,t:'s',l:'f'},
+    {b:55,t:'s',l:'c'},{b:57,t:'g',l:'c'},
+    // drop
+    {b:62,t:'s',l:'f'},{b:63,t:'s',l:'c'},{b:64,t:'s',l:'f'},{b:65,t:'s',l:'c'},
+    {b:67,t:'g',l:'f'},{b:68,t:'s',l:'b'},{b:72,t:'g',l:'c'},{b:73,t:'s',l:'b'},{b:75,t:'s',l:'f'},
+    {b:76,t:'s',l:'c'},{b:78,t:'g',l:'b'},
+    {b:80,t:'p',l:'c',y:0.62},{b:85,t:'s',l:'b'},{b:87,t:'g',l:'f'},{b:89,t:'s',l:'c'},
+    {b:91,t:'s',l:'f'},{b:93,t:'g',l:'b'},
+    {b:98,t:'p',l:'f',y:0.38},
+    {b:101,t:'s',l:'b'},{b:103,t:'g',l:'c'},
+    {b:105,t:'s',l:'f'},{b:107,t:'s',l:'c'},{b:110,t:'g',l:'b'},{b:112,t:'s',l:'b'},
+    {b:114,t:'g',l:'f'},{b:116,t:'s',l:'c'},
+    {b:118,t:'s',l:'f'},{b:122,t:'g',l:'b'},{b:124,t:'s',l:'b'},
+    {b:126,t:'s',l:'c'},{b:128,t:'g',l:'c'},
+    {b:130,t:'s',l:'b'},{b:132,t:'s',l:'f'}
+  ],portals:[{beat:60,factor:1.65,dur:66,label:'2x'}],
+  rotPortals:[{beat:30,dur:14,dir:1},{beat:80,dur:14,dir:-1},{beat:110,dur:10,dir:1}]},
+  {name:'8',beats:136,segs:[
+    {b:2,t:'s',l:'f'},{b:3,t:'s',l:'c'},{b:4,t:'s',l:'f'},{b:5,t:'s',l:'c'},{b:6,t:'s',l:'b'},
+    {b:8,t:'g',l:'f'},{b:9,t:'s',l:'c'},{b:10,t:'s',l:'f'},{b:11,t:'g',l:'c'},
+    {b:13,t:'s',l:'b'},{b:16,t:'s',l:'f'},{b:17,t:'s',l:'c'},
+    {b:19,t:'g',l:'b'},{b:23,t:'s',l:'f'},{b:24,t:'s',l:'c'},
+    {b:25,t:'s',l:'b'},{b:27,t:'g',l:'f'},
+    {b:29,t:'p',l:'f',y:0.38},{b:31,t:'s',l:'c'},
+    {b:33,t:'g',l:'c'},{b:35,t:'s',l:'b'},
+    {b:37,t:'p',l:'c',y:0.62},{b:41,t:'g',l:'b'},{b:43,t:'s',l:'c'},{b:44,t:'s',l:'f'},
+    {b:46,t:'s',l:'b'},{b:48,t:'g',l:'f'},
+    {b:52,t:'s',l:'b'},
+    {b:54,t:'g',l:'c'},{b:56,t:'p',l:'f',y:0.4},
+    {b:58,t:'s',l:'b'},
+    // drop
+    {b:62,t:'s',l:'f'},{b:63,t:'s',l:'c'},{b:64,t:'s',l:'f'},{b:65,t:'s',l:'c'},{b:66,t:'s',l:'b'},
+    {b:68,t:'g',l:'f'},{b:69,t:'s',l:'c'},{b:70,t:'s',l:'f'},{b:71,t:'g',l:'c'},
+    {b:73,t:'s',l:'b'},{b:77,t:'g',l:'b'},{b:79,t:'s',l:'f'},{b:80,t:'s',l:'c'},
+    {b:82,t:'g',l:'f'},{b:84,t:'s',l:'b'},{b:87,t:'g',l:'c'},{b:89,t:'s',l:'b'},
+    {b:91,t:'p',l:'c',y:0.62},{b:94,t:'s',l:'f'},
+    {b:96,t:'g',l:'b'},{b:98,t:'s',l:'c'},
+    {b:102,t:'g',l:'f'},
+    {b:104,t:'s',l:'b'},{b:106,t:'s',l:'c'},
+    {b:107,t:'g',l:'c'},{b:111,t:'g',l:'b'},{b:113,t:'s',l:'f'},
+    {b:114,t:'s',l:'c'},{b:115,t:'s',l:'b'},
+    {b:117,t:'g',l:'f'},{b:119,t:'p',l:'f',y:0.38},
+    {b:122,t:'s',l:'b'},{b:124,t:'g',l:'b'},
+    {b:126,t:'s',l:'f'},{b:127,t:'s',l:'c'},
+    {b:129,t:'g',l:'c'},{b:133,t:'g',l:'b'},{b:135,t:'s',l:'b'}
+  ],portals:[{beat:60,factor:1.7,dur:68,label:'2x'}],
+  rotPortals:[{beat:25,dur:12,dir:-1},{beat:65,dur:12,dir:1},{beat:105,dur:14,dir:-1}]}
+];
+
+// ═══════════════════════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════════════════════
+let lvlIdx=0,attempts=1,running=false,isDead=false,isWon=false;
+let floorCube=null,ceilCube=null;
+let obstacles=[],portals=[];
+let camX=0,levelLen=0;
+let particles=[];
+let curSpeed=BASE_SPEED;
+let activePortal=null;
+let shakeX=0,shakeY=0,shakeDur=0;
+// Rotate portal state
+let rotAngle=0,rotTarget=0,rotPortals=[];
+// Win animation state
+let winAnimT=0,winAnimDur=1.2;
+
+// ═══════════════════════════════════════════════════════
+//  LEVEL SELECT UI
+// ═══════════════════════════════════════════════════════
+(function(){
+  const grid=document.getElementById('lvl-grid');
+  LEVELS.forEach((_,i)=>{
+    const btn=document.createElement('button');
+    btn.className='lvl-btn'+(i===0?' selected':'');
+    btn.textContent=i+1;
+    btn.onclick=()=>{
+      lvlIdx=i;
+      document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    grid.appendChild(btn);
+  });
+})();
+
+function onPlayClick(){attempts=1;startLevel();}
+
+// ═══════════════════════════════════════════════════════
+//  START LEVEL
+// ═══════════════════════════════════════════════════════
+function startLevel(){
+  ensureAudio(); resize();
+  const lvl=LEVELS[lvlIdx];
+  curSong=SONGS[Math.min(lvlIdx,SONGS.length-1)];
+  theme=THEMES[Math.min(lvlIdx,THEMES.length-1)];
+  const BEAT=60/curSong.bpm;
+
+  running=true;isDead=false;isWon=false;
+  winAnimT=0;
+  camX=0;particles=[];curSpeed=BASE_SPEED;activePortal=null;
+  shakeX=0;shakeY=0;shakeDur=0;
+  rotAngle=0;rotTarget=0;rotPortals=[];
+
+  // Apply theme to level select button highlight
+  document.querySelectorAll('.lvl-btn.selected').forEach(b=>{
+    b.style.borderColor=theme.fc;b.style.color=theme.fc;
+  });
+
+  const beatToWX=pb=>(pb+JUMP_ADVANCE)*BEAT*BASE_SPEED+CUBE_X;
+  const GAP_W=BEAT*BASE_SPEED*GAP_BEATS;
+  const PLAT_W=BEAT*BASE_SPEED*3.0; // platform spans 3 beats wide
+  const trackH=GROUND_Y-CEIL_Y;
+
+  clickBeats=new Set();
+  obstacles=[];
+  rings=[];
+  for(const seg of lvl.segs){
+    const pb=Math.round(seg.b);
+    const wx=beatToWX(pb);
+    if(seg.t==='s'){
+      clickBeats.add(pb);
+      const lanes=seg.l==='b'?['f','c']:[seg.l];
+      for(const lane of lanes)
+        obstacles.push({type:'spike',lane,wx,w:SPIKE_W,alive:true});
+    } else if(seg.t==='g'){
+      clickBeats.add(pb);
+      const lanes=seg.l==='b'?['f','c']:[seg.l];
+      for(const lane of lanes)
+        obstacles.push({type:'gap',lane,wx:wx-GAP_W*0.15,w:GAP_W,alive:true});
+    } else if(seg.t==='p'){
+      // Floating platform — y fraction 0=floor 1=ceiling
+      const yFrac=seg.y||0.4;
+      const platY=GROUND_Y - yFrac*trackH - PLAT_H;
+      const platOb={type:'platform',lane:seg.l,wx:wx-PLAT_W*0.3,w:PLAT_W,platY,alive:true};
+      obstacles.push(platOb);
+      // Mandatory gap below (floor plat) or above (ceil plat) spanning the whole platform
+      // If you don't jump and stick to the underside, you fall into the void
+      const gapWx = wx - PLAT_W*0.3;
+      const gapW  = PLAT_W;
+      if(seg.l==='f'){
+        obstacles.push({type:'gap',lane:'f',wx:gapWx,w:gapW,alive:true,fromPlat:true});
+      } else {
+        obstacles.push({type:'gap',lane:'c',wx:gapWx,w:gapW,alive:true,fromPlat:true});
+      }
+    }
+  }
+
+  // Speed portals
+  portals=[];
+  for(const p of(lvl.portals||[])){
+    const wx=beatToWX(p.beat);
+    const endWX=beatToWX(p.beat+p.dur);
+    portals.push({wx,endWX,factor:p.factor,label:p.label||'2x',triggered:false,ended:false});
+  }
+  // Rotate portals — new mechanic in levels 5-8
+  rotPortals=[];
+  for(const rp of(lvl.rotPortals||[])){
+    const wx=beatToWX(rp.beat);
+    const endWX=beatToWX(rp.beat+rp.dur);
+    rotPortals.push({wx,endWX,triggered:false,ended:false,dir:rp.dir||1});
+  }
+
+  levelLen=(lvl.beats+5)*BEAT*BASE_SPEED;
+  floorCube={y:GROUND_Y-CUBE_SZ,vy:0,onGround:true,dead:false,platStuck:null};
+  ceilCube={y:CEIL_Y,vy:0,onCeil:true,dead:false,platStuck:null};
+
+  musicStart=ac.currentTime+0.12;
+  scheduledTo=musicStart;
+
+  document.getElementById('hud-level').textContent='LEVEL '+lvl.name+' — '+curSong.name.toUpperCase();
+  document.getElementById('hud-att').textContent='Attempt '+attempts;
+  document.getElementById('prog-bar').style.background=theme.fc;
+  document.getElementById('prog-bar').style.boxShadow='0 0 8px '+theme.fc;
+
+  ['scr-start','scr-death','scr-win'].forEach(id=>
+    document.getElementById(id).classList.add('hide'));
+}
+
+function nextLevel(){lvlIdx=(lvlIdx+1)%LEVELS.length;attempts=1;startLevel();}
+
+function die(){
+  if(isDead||isWon)return;
+  isDead=true;running=false;attempts++;
+  deathSfx();
+  spawnBurst(CUBE_X+CUBE_SZ/2,floorCube.y+CUBE_SZ/2,theme.fc,16);
+  spawnBurst(CUBE_X+CUBE_SZ/2,ceilCube.y+CUBE_SZ/2,theme.cc,16);
+  // screen shake
+  shakeX=0;shakeY=0;shakeDur=0.45;
+  curSpeed=BASE_SPEED;activePortal=null;
+  setTimeout(()=>{
+    document.getElementById('death-att').textContent='Attempt '+attempts;
+    document.getElementById('scr-death').classList.remove('hide');
+  },500);
+}
+
+function winLevel(){
+  if(isWon||isDead)return;
+  isWon=true;running=false;
+  winAnimT=0;  // Start the suck-in animation
+  winSfx();
+  const last=lvlIdx===LEVELS.length-1;
+  document.getElementById('win-title').textContent=last?'COMPLETE':'CLEAR';
+  document.getElementById('win-title').style.color=theme.fc;
+  document.getElementById('win-sub').textContent='Level '+(lvlIdx+1)+' Complete';
+  document.getElementById('next-btn').textContent=last?'PLAY AGAIN':'NEXT LEVEL';
+  setTimeout(()=>document.getElementById('scr-win').classList.remove('hide'),400);
+}
+
+// ═══════════════════════════════════════════════════════
+//  PHYSICS
+// ═══════════════════════════════════════════════════════
+function updatePhysics(dt){
+  if(!floorCube||!ceilCube)return;
+  const cx=CUBE_X+CUBE_SZ/2;
+  const mid=(GROUND_Y+CEIL_Y)/2;
+
+  // ═══ FLOOR CUBE ═══
+  // When stuck to underside of platform, gravity pulls UP (towards platform)
+  const fGrav = floorCube.platStuck ? -GRAVITY : GRAVITY;
+  floorCube.vy += fGrav * dt;
+  floorCube.y  += floorCube.vy * dt;
+  floorCube.onGround = false;
+
+  if(floorCube.platStuck){
+    // Locked to UNDERSIDE: cube top flush with platform bottom
+    // platY is top of platform bar, so underside = platY + PLAT_H
+    // cube top (y) = platY + PLAT_H  →  cube drawn from y to y+CUBE_SZ downward
+    floorCube.y = floorCube.platStuck.platY + PLAT_H;
+    floorCube.vy = 0;
+    floorCube.onGround = true;
+    // Detach if cube scrolls past platform end
+    const psx = floorCube.platStuck.wx - camX;
+    if(cx <= psx || cx >= psx + floorCube.platStuck.w){
+      floorCube.platStuck = null;
+    }
+  } else {
+    // Normal floor/gap logic — skip fromPlat gaps if cube is stuck to platform
+    let overFG = false;
+    for(const ob of obstacles){
+      if(ob.type!=='gap'||ob.lane!=='f'||!ob.alive)continue;
+      if(ob.fromPlat && floorCube.platStuck) continue; // riding the platform, immune
+      const sx=ob.wx-camX;
+      if(cx>sx&&cx<sx+ob.w){overFG=true;break;}
+    }
+    if(!overFG && floorCube.y >= GROUND_Y-CUBE_SZ){
+      floorCube.y = GROUND_Y-CUBE_SZ; floorCube.vy=0; floorCube.onGround=true;
+    }
+
+    // Snap to TOP of floor platforms (normal landing — jumping over them)
+    if(!floorCube.onGround && floorCube.vy >= 0){
+      for(const ob of obstacles){
+        if(ob.type!=='platform'||ob.lane!=='f'||!ob.alive)continue;
+        const sx=ob.wx-camX;
+        if(cx<=sx||cx>=sx+ob.w)continue;
+        const platTop=ob.platY;
+        if(floorCube.y+CUBE_SZ>=platTop && floorCube.y+CUBE_SZ<=platTop+PLAT_H+16){
+          floorCube.y=platTop-CUBE_SZ; floorCube.vy=0; floorCube.onGround=true;
+        }
+      }
+    }
+
+    // Hit UNDERSIDE while jumping up → STICK (cube hangs below platform)
+    if(!floorCube.onGround && floorCube.vy < 0){
+      for(const ob of obstacles){
+        if(ob.type!=='platform'||ob.lane!=='f'||!ob.alive)continue;
+        const sx=ob.wx-camX;
+        if(cx<=sx||cx>=sx+ob.w)continue;
+        // Cube top (floorCube.y) hits platform bottom (ob.platY + PLAT_H)
+        const platBot = ob.platY + PLAT_H;
+        if(floorCube.y <= platBot && floorCube.y >= platBot + floorCube.vy*dt - 20){
+          floorCube.platStuck = ob;
+          floorCube.y = platBot;       // cube top = platform bottom → hangs below
+          floorCube.vy = 0;
+          floorCube.onGround = true;
+          if(ac) osc(520,'square',0.15,0.06,ac.currentTime);
+          spawnBurst(cx, floorCube.y, theme.fc, 6);
+          break;
+        }
+      }
+    }
+
+    // Die if fallen too far
+    if(floorCube.y > GROUND_Y+80){ die(); return; }
+    if(floorCube.y < mid-CUBE_SZ) floorCube.y=mid-CUBE_SZ;
+  }
+
+  // ═══ CEILING CUBE ═══
+  // When stuck to top of platform, gravity pulls DOWN (towards platform)
+  const cGrav = ceilCube.platStuck ? GRAVITY : -GRAVITY;
+  ceilCube.vy += cGrav * dt;
+  ceilCube.y  += ceilCube.vy * dt;
+  ceilCube.onCeil = false;
+
+  if(ceilCube.platStuck){
+    // Locked to TOP: cube bottom flush with platform top
+    // cube bottom (y+CUBE_SZ) = platY  →  cube.y = platY - CUBE_SZ
+    ceilCube.y = ceilCube.platStuck.platY - CUBE_SZ;
+    ceilCube.vy = 0;
+    ceilCube.onCeil = true;
+    const psx = ceilCube.platStuck.wx - camX;
+    if(cx <= psx || cx >= psx + ceilCube.platStuck.w){
+      ceilCube.platStuck = null;
+    }
+  } else {
+    let overCG = false;
+    for(const ob of obstacles){
+      if(ob.type!=='gap'||ob.lane!=='c'||!ob.alive)continue;
+      if(ob.fromPlat && ceilCube.platStuck) continue; // riding the platform, immune
+      const sx=ob.wx-camX;
+      if(cx>sx&&cx<sx+ob.w){overCG=true;break;}
+    }
+    if(!overCG && ceilCube.y <= CEIL_Y){
+      ceilCube.y=CEIL_Y; ceilCube.vy=0; ceilCube.onCeil=true;
+    }
+
+    // Snap to UNDERSIDE of ceiling platforms (normal hang)
+    if(!ceilCube.onCeil && ceilCube.vy <= 0){
+      for(const ob of obstacles){
+        if(ob.type!=='platform'||ob.lane!=='c'||!ob.alive)continue;
+        const sx=ob.wx-camX;
+        if(cx<=sx||cx>=sx+ob.w)continue;
+        const platBot=ob.platY+PLAT_H;
+        if(ceilCube.y<=platBot && ceilCube.y>=platBot+ceilCube.vy*dt-16){
+          ceilCube.y=platBot; ceilCube.vy=0; ceilCube.onCeil=true;
+        }
+      }
+    }
+
+    // Hit TOP of ceiling platform while jumping down → STICK (cube sits on top)
+    if(!ceilCube.onCeil && ceilCube.vy > 0){
+      for(const ob of obstacles){
+        if(ob.type!=='platform'||ob.lane!=='c'||!ob.alive)continue;
+        const sx=ob.wx-camX;
+        if(cx<=sx||cx>=sx+ob.w)continue;
+        const platTop = ob.platY;
+        // cube bottom (y+CUBE_SZ) hits platform top
+        if(ceilCube.y+CUBE_SZ >= platTop && ceilCube.y+CUBE_SZ <= platTop+ceilCube.vy*dt+20){
+          ceilCube.platStuck = ob;
+          ceilCube.y = platTop - CUBE_SZ;   // cube bottom = platform top → sits on top
+          ceilCube.vy = 0;
+          ceilCube.onCeil = true;
+          if(ac) osc(520,'square',0.15,0.06,ac.currentTime);
+          spawnBurst(cx, ceilCube.y+CUBE_SZ, theme.cc, 6);
+          break;
+        }
+      }
+    }
+
+    if(ceilCube.y < CEIL_Y-80){ die(); return; }
+    if(ceilCube.y > mid) ceilCube.y=mid;
+  }
+}
+
+function doJumpFloor(){
+  if(!floorCube)return;
+  if(floorCube.platStuck){
+    // Detach — drop downward away from platform
+    floorCube.platStuck=null;
+    floorCube.vy = JUMP_VEL*0.4;  // positive = downward
+    jumpSfx(true);
+    return;
+  }
+  if(!floorCube.onGround)return;
+  floorCube.vy=-JUMP_VEL; floorCube.onGround=false;
+  jumpSfx(true);
+}
+
+function doJumpCeil(){
+  if(!ceilCube)return;
+  if(ceilCube.platStuck){
+    // Detach — push upward away from platform
+    ceilCube.platStuck=null;
+    ceilCube.vy = -JUMP_VEL*0.4;  // negative = upward
+    jumpSfx(false);
+    return;
+  }
+  if(!ceilCube.onCeil)return;
+  ceilCube.vy=JUMP_VEL; ceilCube.onCeil=false;
+  jumpSfx(false);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SPEED PORTALS
+// ═══════════════════════════════════════════════════════
+function updatePortals(){
+  const cx=CUBE_X+CUBE_SZ/2;
+  for(const p of portals){
+    if(!p.triggered){
+      const sx=p.wx-camX;
+      if(sx<cx){
+        p.triggered=true;
+        curSpeed=BASE_SPEED*p.factor;
+        // Flash effect
+        const flash=document.getElementById('speed-flash');
+        flash.style.opacity='1';
+        setTimeout(()=>flash.style.opacity='0',120);
+        // SFX: quick rising tone
+        if(ac){osc(440,'sine',0.3,0.08,ac.currentTime);osc(880,'sine',0.2,0.06,ac.currentTime+0.05);}
+      }
+    }
+    if(p.triggered&&!p.ended){
+      const sx=p.endWX-camX;
+      if(sx<cx){
+        p.ended=true;
+        curSpeed=BASE_SPEED;
+        const flash=document.getElementById('speed-flash');
+        flash.style.opacity='0.5';
+        setTimeout(()=>flash.style.opacity='0',80);
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  ROTATE PORTALS
+// ═══════════════════════════════════════════════════════
+function updateRotPortals(dt){
+  const cx=CUBE_X+CUBE_SZ/2;
+  for(const rp of rotPortals){
+    if(!rp.triggered){
+      const sx=rp.wx-camX;
+      if(sx<cx){
+        rp.triggered=true;
+        rotTarget=rp.dir * Math.PI/2;  // 90° tilt
+        // SFX
+        if(ac){osc(330,'sine',0.2,0.12,ac.currentTime);osc(550,'sine',0.15,0.1,ac.currentTime+0.06);}
+      }
+    }
+    if(rp.triggered&&!rp.ended){
+      const sx=rp.endWX-camX;
+      if(sx<cx){
+        rp.ended=true;
+        rotTarget=0; // snap back
+        if(ac){osc(220,'sine',0.2,0.1,ac.currentTime);}
+      }
+    }
+  }
+  // Smoothly tween rotAngle toward rotTarget
+  const diff=rotTarget-rotAngle;
+  rotAngle+=diff*Math.min(1, dt*6);
+  if(Math.abs(diff)<0.0005) rotAngle=rotTarget;
+}
+function checkSpikes(){
+  if(!floorCube||!ceilCube)return;
+  const M=5,cL=CUBE_X+M,cR=CUBE_X+CUBE_SZ-M;
+  for(const ob of obstacles){
+    if(ob.type!=='spike'||!ob.alive)continue;
+    const sx=ob.wx-camX;
+    const oL=sx+M,oR=sx+ob.w-M;
+    if(oR<cL||oL>cR)continue;
+    if(ob.lane==='f' && floorCube.y+CUBE_SZ > GROUND_Y-SPIKE_H+M){ die(); return; }
+    if(ob.lane==='c' && ceilCube.y < CEIL_Y+SPIKE_H-M){ die(); return; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PARTICLES
+// ═══════════════════════════════════════════════════════
+function spawnTrail(x,y,col){
+  // Always spawn — creates a continuous ribbon trail
+  for(let i=0;i<2;i++){
+    particles.push({
+      x:x+Math.random()*CUBE_SZ,
+      y:y+CUBE_SZ/2+(Math.random()-0.5)*CUBE_SZ*0.4,
+      vx:-55+Math.random()*20,
+      vy:(Math.random()-.5)*22,
+      r:1.8+Math.random()*2.5,
+      life:1,decay:0.055+Math.random()*0.03,
+      col,isTrail:true
+    });
+  }
+}
+function spawnBurst(x,y,col,n){
+  for(let i=0;i<n;i++){
+    const a=(i/n)*Math.PI*2,sp=55+Math.random()*160;
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+      r:2+Math.random()*3.2,life:1,decay:0.022+Math.random()*0.015,col});
+  }
+}
+function tickParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=160*dt;p.life-=p.decay;
+    if(p.life<=0)particles.splice(i,1);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════════════════
+let bgPulse=0;
+function getBeatPulse(){
+  if(!ac||!running)return 0;
+  const BEAT=60/curSong.bpm;
+  const frac=((ac.currentTime-musicStart)/BEAT)%1;
+  return Math.max(0,1-frac*5);
+}
+
+function drawBg(){
+  ctx.fillStyle=theme.bg;
+  ctx.fillRect(0,0,W,H);
+  bgPulse=getBeatPulse();
+  if(bgPulse>0.01){
+    const g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.5);
+    g.addColorStop(0,theme.ac+bgPulse*0.06+')');
+    g.addColorStop(.55,theme.cc2+bgPulse*0.025+')');
+    g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  }
+  if(analyser&&running){
+    analyser.getByteFrequencyData(freqData);
+    const bw=W/freqData.length;
+    for(let i=0;i<freqData.length;i++){
+      const v=freqData[i]/255;
+      ctx.fillStyle=theme.ac+v*0.08+')';
+      ctx.fillRect(i*bw,H-v*H*0.08,bw,v*H*0.08);
+      ctx.fillStyle=theme.cc2+v*0.08+')';
+      ctx.fillRect(i*bw,0,bw,v*H*0.08);
+    }
+  }
+}
+
+function drawTracks(){
+  ctx.fillStyle=theme.ac+'0.055)';ctx.fillRect(0,GROUND_Y,W,H-GROUND_Y);
+  ctx.fillStyle=theme.fc;ctx.fillRect(0,GROUND_Y,W,2);
+  ctx.fillStyle=theme.cc2+'0.055)';ctx.fillRect(0,0,W,CEIL_Y);
+  ctx.fillStyle=theme.cc;ctx.fillRect(0,CEIL_Y-2,W,2);
+  // Beat grid
+  if(ac&&running){
+    const BEAT=60/curSong.bpm;
+    const beatPx=BEAT*BASE_SPEED;
+    const off=camX%beatPx;
+    ctx.setLineDash([3,6]);
+    ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=1;
+    for(let x=beatPx-off;x<W+beatPx;x+=beatPx){
+      ctx.beginPath();ctx.moveTo(x,CEIL_Y);ctx.lineTo(x,GROUND_Y);ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  // Speed portals — draw entry gate and (when triggered) end/slowdown line
+  for(const p of portals){
+    if(p.ended) continue;
+
+    // ── Entry gate (start of speed-up) ──
+    const sx = p.wx - camX;
+    if(sx > -20 && sx < W + 20){
+      ctx.save();
+      ctx.shadowColor = '#fff'; ctx.shadowBlur = 20;
+      ctx.strokeStyle = p.triggered ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8,4]);
+      ctx.beginPath(); ctx.moveTo(sx,CEIL_Y); ctx.lineTo(sx,GROUND_Y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = p.triggered ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
+      ctx.font = 'bold 11px DM Mono,monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.label||'2x', sx, (CEIL_Y+GROUND_Y)/2 - 10);
+      ctx.restore();
+    }
+
+    // ── Slowdown line (end of speed-up zone) — only show once portal is triggered ──
+    if(p.triggered){
+      const ex = p.endWX - camX;
+      if(ex > -20 && ex < W + 20){
+        ctx.save();
+        // Orange/amber glow to contrast with white entry gate
+        ctx.shadowColor = '#fa4'; ctx.shadowBlur = 18;
+        ctx.strokeStyle = 'rgba(255,180,40,0.85)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([5,5]);
+        ctx.beginPath(); ctx.moveTo(ex,CEIL_Y); ctx.lineTo(ex,GROUND_Y); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(255,180,40,0.85)';
+        ctx.font = 'bold 10px DM Mono,monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('1x', ex, (CEIL_Y+GROUND_Y)/2 - 10);
+        // Shaded zone between current position and end line
+        const zoneStart = Math.max(0, sx);
+        const zoneW = ex - zoneStart;
+        if(zoneW > 0){
+          ctx.fillStyle = 'rgba(255,160,0,0.04)';
+          ctx.fillRect(zoneStart, CEIL_Y, zoneW, GROUND_Y - CEIL_Y);
+        }
+        ctx.restore();
+      }
+    }
+  }
+  // Rotate portal gates — purple spinning gate
+  for(const rp of rotPortals){
+    if(rp.ended) continue;
+    const sx=rp.wx-camX;
+    if(sx>-20&&sx<W+20){
+      ctx.save();
+      const spin=Date.now()*0.003;
+      ctx.shadowColor='#c060ff';ctx.shadowBlur=22;
+      ctx.strokeStyle=rp.triggered?'rgba(180,80,255,0.3)':'rgba(180,80,255,0.85)';
+      ctx.lineWidth=3;
+      ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(sx,CEIL_Y);ctx.lineTo(sx,GROUND_Y);ctx.stroke();
+      ctx.setLineDash([]);
+      // Spinning diamond icon
+      ctx.save();
+      ctx.translate(sx,(CEIL_Y+GROUND_Y)/2);
+      ctx.rotate(spin);
+      ctx.strokeStyle='rgba(200,100,255,0.9)';ctx.lineWidth=2;
+      ctx.strokeRect(-9,-9,18,18);
+      ctx.restore();
+      ctx.fillStyle='rgba(180,80,255,0.85)';
+      ctx.font='bold 10px DM Mono,monospace';
+      ctx.textAlign='center';
+      ctx.fillText('90°',sx,(CEIL_Y+GROUND_Y)/2+22);
+      ctx.restore();
+    }
+  }
+
+  for(const ob of obstacles){
+    if(ob.type!=='platform'||!ob.alive)continue;
+    const sx=ob.wx-camX;
+    if(sx>W+10||sx+ob.w<-10)continue;
+    const py=ob.platY;
+    const col=ob.lane==='f'?theme.fc:theme.cc;
+    const isStuckTo=(ob.lane==='f'&&floorCube&&floorCube.platStuck===ob)||
+                    (ob.lane==='c'&&ceilCube&&ceilCube.platStuck===ob);
+    ctx.save();
+    ctx.shadowColor=col;ctx.shadowBlur=isStuckTo?18:8;
+    // Main bar
+    ctx.fillStyle=col;
+    ctx.fillRect(sx,py,ob.w,PLAT_H);
+    // Darker center stripe
+    ctx.fillStyle='rgba(0,0,0,0.38)';
+    ctx.fillRect(sx,py+PLAT_H*0.3,ob.w,PLAT_H*0.4);
+    // Grip nubs on the sticky surface
+    // Floor platform: nubs on bottom (underside = sticky)
+    // Ceiling platform: nubs on top (top = sticky)
+    const nubY = ob.lane==='f' ? py+PLAT_H : py;
+    const nubDir = ob.lane==='f' ? 1 : -1;
+    ctx.fillStyle=col;ctx.globalAlpha=0.55;
+    for(let nx=sx+12;nx<sx+ob.w-8;nx+=22){
+      ctx.beginPath();
+      ctx.moveTo(nx,nubY);
+      ctx.lineTo(nx+5,nubY+nubDir*7);
+      ctx.lineTo(nx+10,nubY);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  // Gaps
+  for(const ob of obstacles){
+    if(ob.type!=='gap'||!ob.alive)continue;
+    const sx=ob.wx-camX;
+    if(sx>W+10||sx+ob.w<-10)continue;
+    if(ob.lane==='f'){
+      ctx.fillStyle=theme.bg;ctx.fillRect(sx,GROUND_Y-1,ob.w,H-GROUND_Y+2);
+      ctx.fillStyle='rgba(255,55,55,0.55)';
+      ctx.fillRect(sx,GROUND_Y-4,3,18);ctx.fillRect(sx+ob.w-3,GROUND_Y-4,3,18);
+    }else{
+      ctx.fillStyle=theme.bg;ctx.fillRect(sx,0,ob.w,CEIL_Y+1);
+      ctx.fillStyle='rgba(255,55,55,0.55)';
+      ctx.fillRect(sx,CEIL_Y-14,3,18);ctx.fillRect(sx+ob.w-3,CEIL_Y-14,3,18);
+    }
+  }
+}
+
+function drawSpikes(){
+  for(const ob of obstacles){
+    if(ob.type!=='spike'||!ob.alive)continue;
+    const sx=ob.wx-camX;
+    if(sx>W+10||sx+ob.w<-10)continue;
+    const isF=ob.lane==='f';
+    ctx.save();
+    ctx.shadowColor=isF?theme.ac+'0.5)':theme.cc2+'0.5)';
+    ctx.shadowBlur=14;
+    ctx.fillStyle=isF?theme.fc:theme.cc;
+    ctx.beginPath();
+    if(isF){ctx.moveTo(sx,GROUND_Y);ctx.lineTo(sx+ob.w/2,GROUND_Y-SPIKE_H);ctx.lineTo(sx+ob.w,GROUND_Y);}
+    else{ctx.moveTo(sx,CEIL_Y);ctx.lineTo(sx+ob.w/2,CEIL_Y+SPIKE_H);ctx.lineTo(sx+ob.w,CEIL_Y);}
+    ctx.closePath();ctx.fill();ctx.restore();
+  }
+}
+
+function drawCube(x,y,col,glowCol,rot){
+  ctx.save();
+  ctx.translate(x+CUBE_SZ/2,y+CUBE_SZ/2);ctx.rotate(rot);
+  ctx.shadowColor=glowCol;ctx.shadowBlur=18;
+  ctx.fillStyle=col;
+  ctx.fillRect(-CUBE_SZ/2,-CUBE_SZ/2,CUBE_SZ,CUBE_SZ);
+  ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1.5;
+  ctx.strokeRect(-CUBE_SZ/2+5,-CUBE_SZ/2+5,CUBE_SZ-10,CUBE_SZ-10);
+  ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.beginPath();ctx.arc(0,0,3,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+
+function drawPlayers(){
+  for(const p of particles){
+    ctx.save();ctx.globalAlpha=p.life*0.55;ctx.fillStyle=p.col;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r*(0.3+p.life*0.7),0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  if(!floorCube||!ceilCube)return;
+  const now=ac?ac.currentTime:0;
+  const BEAT=60/curSong.bpm;
+  const beat=(now-musicStart)/BEAT;
+  const rot=beat*Math.PI*0.5;
+  
+  // Win animation: cubes get sucked to center + scale down
+  let fX=CUBE_X, fY=floorCube.y, cX=CUBE_X, cY=ceilCube.y, fScale=1, cScale=1;
+  if(isWon && winAnimT < winAnimDur){
+    const prog = winAnimT / winAnimDur; // 0 to 1
+    const finishX = levelLen - camX;
+    const centerY = (GROUND_Y + CEIL_Y) / 2;
+    fX += (finishX - CUBE_X) * prog * prog;
+    fY += (centerY - floorCube.y) * prog * prog;
+    cX += (finishX - CUBE_X) * prog * prog;
+    cY += (centerY - ceilCube.y) * prog * prog;
+    fScale = 1 - prog * 0.6;
+    cScale = 1 - prog * 0.6;
+  }
+  
+  // Floor cube: spin always except when stuck to platform
+  if(!floorCube.dead){
+    ctx.save();
+    ctx.translate(fX, fY);
+    ctx.scale(fScale, fScale);
+    ctx.translate(-fX, -fY);
+    const fRot = floorCube.platStuck ? 0 : rot;
+    drawCube(fX, fY, theme.fc, theme.ac+'0.9)', fRot);
+    ctx.restore();
+  }
+  
+  // Ceiling cube: spin always except when stuck to platform
+  if(!ceilCube.dead){
+    ctx.save();
+    ctx.translate(cX, cY);
+    ctx.scale(cScale, cScale);
+    ctx.translate(-cX, -cY);
+    const cRot = ceilCube.platStuck ? 0 : -rot;
+    drawCube(cX, cY, theme.cc, theme.cc2+'0.9)', cRot);
+    ctx.restore();
+  }
+}
+
+function drawFinish(){
+  if(!levelLen)return;
+  const fx=levelLen-camX;
+  if(fx<-20||fx>W+20)return;
+  const sq=10,h=GROUND_Y-CEIL_Y;
+  ctx.save();
+  for(let row=0;row<h/sq;row++){
+    for(let col=0;col<3;col++){
+      ctx.fillStyle=(row+col)%2===0?'rgba(255,255,255,0.4)':'rgba(255,255,255,0.03)';
+      ctx.fillRect(fx+col*4,CEIL_Y+row*sq,4,sq);
+    }
+  }
+  ctx.shadowColor='#fff';ctx.shadowBlur=16;
+  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(fx,CEIL_Y);ctx.lineTo(fx,GROUND_Y);ctx.stroke();
+  ctx.restore();
+}
+
+function updateHUD(){
+  if(!levelLen)return;
+  const pct=Math.min(100,Math.max(0,camX/(levelLen-W*0.12)*100));
+  document.getElementById('prog-bar').style.width=pct+'%';
+  document.getElementById('hud-pct').textContent=Math.floor(pct)+'%';
+}
+
+// ═══════════════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════════════
+let rafId=null,lastTs=0;
+function loop(ts){
+  rafId=requestAnimationFrame(loop);
+  const dt=Math.min((ts-lastTs)/1000,0.05);
+  lastTs=ts;
+  if(ac&&running)scheduleMusic();
+  if(running){
+    updatePhysics(dt);
+    updatePortals();
+    updateRotPortals(dt);
+    camX+=curSpeed*dt;
+    if(!isDead){checkSpikes();}
+    if(!isDead){
+      spawnTrail(CUBE_X,floorCube.y,theme.fc);
+      spawnTrail(CUBE_X,ceilCube.y,theme.cc);
+    }
+    if(!isDead&&camX>=levelLen-W*0.12)winLevel();
+    updateHUD();
+  }
+  // Tick win animation
+  if(isWon && winAnimT < winAnimDur){
+    winAnimT += dt;
+  }
+  // Screen shake
+  if(shakeDur>0){
+    shakeDur-=dt;
+    const mag=Math.min(shakeDur,0.3)*22;
+    shakeX=(Math.random()-0.5)*mag;
+    shakeY=(Math.random()-0.5)*mag;
+  } else {shakeX=0;shakeY=0;}
+  tickParticles(dt);
+  ctx.save();
+  // Apply screen shake + rotate portal tilt around screen center
+  ctx.translate(W/2+shakeX, H/2+shakeY);
+  ctx.rotate(rotAngle);
+  ctx.translate(-W/2, -H/2);
+  drawBg();drawTracks();drawSpikes();drawFinish();drawPlayers();
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const k=e.key.toLowerCase();
+  if(!document.getElementById('scr-death').classList.contains('hide')){
+    if(k==='f'||k==='j'||k===' '){startLevel();return;}
+  }
+  if(!document.getElementById('scr-win').classList.contains('hide')){
+    if(k==='f'||k==='j'||k===' '){nextLevel();return;}
+  }
+  if(!running)return;
+  if(k==='f'){doJumpFloor();const el=document.getElementById('hkf');el.classList.add('lit');setTimeout(()=>el.classList.remove('lit'),100);}
+  if(k==='j'){doJumpCeil();const el=document.getElementById('hkj');el.classList.add('lit');setTimeout(()=>el.classList.remove('lit'),100);}
+});
+
+rafId=requestAnimationFrame(loop);
+</script>
+</body>
+</html>
