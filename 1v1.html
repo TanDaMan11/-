@@ -598,16 +598,38 @@
         let opponentRematchReady = false;
 
         // ── Bot state ──────────────────────────────────────────────────────────
-        let botDifficulty = 'medium'; // 'easy' | 'medium' | 'hard'
-        let botAttackDelay = 0;       // countdown before bot actually swings
-        let botJumpCooldown = 0;      // prevents spam-jumping
+        let botDifficulty    = 'medium';
+        let botAttackDelay   = 0;
+        let botJumpCooldown  = 0;
+        let botState         = 'idle';   // idle | escape | approach | rising | divebomb | postdive
+        let botStateCooldown = 0;
 
-        // Per-difficulty tuning
+        // Tracks how long the bot has been moving toward a wall with the player
+        // also on the wall side (i.e. being chased into a corner)
+        let botCornerTimer   = 0;   // ticks spent being chased toward wall
+        let botEscapeDir     = 0;   // +1 or -1: which way to run during escape
+        let botLastX         = 0;   // for velocity smoothing reference
+
         const BOT_SETTINGS = {
-            easy:   { reactionRange: 220, retreatDist: 90,  attackRange: 160, jumpChance: 0.003, attackDelay: 38, aggressionFactor: 0.6 },
-            medium: { reactionRange: 320, retreatDist: 110, attackRange: 190, jumpChance: 0.006, attackDelay: 20, aggressionFactor: 0.85 },
-            hard:   { reactionRange: 500, retreatDist: 120, attackRange: 200, jumpChance: 0.010, attackDelay: 8,  aggressionFactor: 1.0 }
+            easy: {
+                attackRange: 200, attackDelay: 20, aggressionFactor: 0.85,
+                retreatDist: 120, cornerTrigger: 120,   // ~2 s at 60fps ÷ TICK
+                diveEnabled: false, jumpChance: 0.006
+            },
+            medium: {
+                attackRange: 210, attackDelay: 10, aggressionFactor: 0.95,
+                retreatDist: 130, cornerTrigger: 90,
+                diveEnabled: true, diveChance: 0.006, jumpChance: 0.007
+            },
+            hard: {
+                attackRange: 225, attackDelay: 4, aggressionFactor: 1.0,
+                retreatDist: 140, cornerTrigger: 70,
+                diveEnabled: true, diveChance: 0.018, jumpChance: 0.009
+            }
         };
+
+        // GAME_TICK_RATE is 12 ms → ~83 ticks/s. 2 s ≈ 167 ticks.
+        // cornerTrigger values above are already in tick units.
 
         // DOM refs
         const lobby          = document.getElementById('lobby');
@@ -632,17 +654,29 @@
         const botBadge       = document.getElementById('botBadge');
 
         // ── Difficulty selector ────────────────────────────────────────────────
+        const DIFF_DESCRIPTIONS = {
+            easy:   '🟢 <b>Easy</b> — Chases you down and swings on sight. Holds its ground near walls instead of walking into them, but won\'t try anything clever. Good for learning the controls.',
+            medium: '🟡 <b>Medium</b> — Keeps optimal spacing, retreats when you get too close, and occasionally leaps up and dive-bombs you for a critical hit on the way down. Will jump over you to escape corners.',
+            hard:   '🔴 <b>Hard</b> — Full read-and-react AI. Refuses to chase you into walls. Regularly performs the double-jump dive-bomb critical, then immediately follows up with a ground hit. Escapes every corner with a punishing counter-attack. Will swing at any falling moment it has range on you.'
+        };
+
+        function updateDiffDesc() {
+            document.getElementById('diffDesc').innerHTML = DIFF_DESCRIPTIONS[botDifficulty];
+        }
+
         document.querySelectorAll('.diff-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
                 botDifficulty = btn.dataset.diff;
+                updateDiffDesc();
             });
         });
 
         botBtn.addEventListener('click', () => {
             mainButtons.style.display = 'none';
             botDiffDiv.classList.add('active');
+            updateDiffDesc();
             showStatus('');
         });
 
@@ -1106,67 +1140,233 @@
         }
 
         // ── Bot AI ─────────────────────────────────────────────────────────────
-        /**
-         * Generates a synthetic "keys" object for player2 (the bot) based on
-         * the current game state. Called once per game tick when gameMode === 'bot'.
-         *
-         * Returns an object with the same shape as the human `keys` map
-         * but only for player2's control keys.
-         */
         function computeBotKeys() {
-            const settings   = BOT_SETTINGS[botDifficulty];
-            const bot        = player2;
-            const target     = player1;
-            const botKeys    = {};
+            const cfg     = BOT_SETTINGS[botDifficulty];
+            const bot     = player2;
+            const target  = player1;
+            const botKeys = {};
 
-            const dx         = target.x - bot.x;
-            const absDx      = Math.abs(dx);
-            const facingTarget = (dx > 0) === bot.facingRight; // is bot already facing the player?
+            const dx           = target.x - bot.x;
+            const absDx        = Math.abs(dx);
+            const facingTarget = (dx > 0) === bot.facingRight;
 
-            // ── Horizontal movement ──────────────────────────────────────────
-            if (absDx > settings.reactionRange) {
-                // Walk toward player (aggression controls how reliably they close gap)
-                if (Math.random() < settings.aggressionFactor) {
-                    botKeys[bot.controls.right] = dx > 0;
-                    botKeys[bot.controls.left]  = dx < 0;
-                }
-            } else if (absDx < settings.retreatDist) {
-                // Too close – back up
-                botKeys[bot.controls.right] = dx < 0;
-                botKeys[bot.controls.left]  = dx > 0;
-            } else {
-                // Medium range – strafe toward player
-                if (Math.random() < settings.aggressionFactor) {
-                    botKeys[bot.controls.right] = dx > 0;
-                    botKeys[bot.controls.left]  = dx < 0;
-                }
+            // ── Positional awareness ─────────────────────────────────────────
+            // Hard margin: how close to the wall edge is dangerous
+            const WALL_HARD = PLAYER_MARGIN + 60;   // actual wall
+            const WALL_SOFT = PLAYER_MARGIN + 260;  // "getting close" zone
+
+            const atLeftWall   = bot.x < WALL_HARD;
+            const atRightWall  = bot.x > WORLD_WIDTH - WALL_HARD;
+            const nearLeftWall = bot.x < WALL_SOFT;
+            const nearRightWall= bot.x > WORLD_WIDTH - WALL_SOFT;
+
+            // "Being chased into corner": bot is near a wall AND target is on
+            // the same side (pushing bot further in)
+            const chasedLeft  = nearLeftWall  && dx < 0;  // target is to bot's left
+            const chasedRight = nearRightWall && dx > 0;  // target is to bot's right
+            const beingChased = chasedLeft || chasedRight;
+
+            // ── Corner timer: accumulate ticks while being chased ────────────
+            if (beingChased && bot.grounded && botState === 'idle') {
+                botCornerTimer++;
+            } else if (!beingChased) {
+                botCornerTimer = 0;
             }
 
-            // ── Jumping ──────────────────────────────────────────────────────
-            if (botJumpCooldown > 0) {
-                botJumpCooldown--;
-            } else if (bot.grounded && Math.random() < settings.jumpChance) {
-                botKeys[bot.controls.jump] = true;
-                botJumpCooldown = 90; // don't spam jump
-            } else {
-                // Jump over player if they're extremely close and bot is cornered
-                if (absDx < 80 && bot.grounded && Math.random() < 0.02) {
+            // ── Tick-down counters ───────────────────────────────────────────
+            if (botJumpCooldown  > 0) botJumpCooldown--;
+            if (botStateCooldown > 0) botStateCooldown--;
+            if (botAttackDelay   > 0) botAttackDelay--;
+
+            // ── Trigger wall-escape when cornered long enough ────────────────
+            // (or immediately if pressed against the hard wall)
+            const cornerTriggered = botCornerTimer > cfg.cornerTrigger ||
+                                    (atLeftWall || atRightWall);
+
+            if (botState === 'idle' && cornerTriggered && botStateCooldown <= 0) {
+                botState        = 'escape';
+                botEscapeDir    = chasedLeft ? 1 : -1; // run AWAY from wall
+                botCornerTimer  = 0;
+                // escape lasts long enough to clear the wall zone
+                botStateCooldown = 80 + Math.floor(Math.random() * 40);
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // STATE: ESCAPE  – jump over/past the player, turn around, punish
+            // ══════════════════════════════════════════════════════════════════
+            if (botState === 'escape') {
+                // Always move away from the wall we were cornered against
+                botKeys[bot.controls.right] = botEscapeDir > 0;
+                botKeys[bot.controls.left]  = botEscapeDir < 0;
+
+                // Jump immediately to go over the player if they're in the way
+                if (bot.grounded && botJumpCooldown <= 0) {
                     botKeys[bot.controls.jump] = true;
-                    botJumpCooldown = 60;
+                    botJumpCooldown = 10;
                 }
-            }
+                // Double-jump if still rising and target is close (leap over them)
+                if (!bot.grounded && bot.jumpCount < bot.maxJumps &&
+                    bot.vy > -6 && botJumpCooldown <= 0 && absDx < 200) {
+                    botKeys[bot.controls.jump] = true;
+                    botJumpCooldown = 30;
+                }
 
-            // ── Attacking ────────────────────────────────────────────────────
-            // Only attack when roughly in range and facing the target
-            if (absDx < settings.attackRange && bot.attackCooldown <= 0 && !bot.attacking) {
-                if (botAttackDelay <= 0) {
+                // Attack on the way past if falling (free crit!) — wide window
+                if (bot.canCrit && absDx < cfg.attackRange + 80 &&
+                    bot.attackCooldown <= 0 && !bot.attacking) {
+                    botKeys[bot.controls.attack] = true;
+                }
+                // Also ground-attack if we end up right next to them after landing
+                if (bot.grounded && absDx < cfg.attackRange * 0.8 &&
+                    bot.attackCooldown <= 0 && !bot.attacking && botAttackDelay <= 0) {
                     if (facingTarget) {
                         botKeys[bot.controls.attack] = true;
-                        // Reset delay so next attack also has a gap
-                        botAttackDelay = settings.attackDelay + Math.floor(Math.random() * 15);
+                        botAttackDelay = cfg.attackDelay;
+                    }
+                }
+
+                // Exit escape when timer runs out OR we've cleared the wall zone
+                if (botStateCooldown <= 0 || (!nearLeftWall && !nearRightWall && bot.grounded)) {
+                    botState        = 'idle';
+                    botCornerTimer  = 0;
+                    botStateCooldown = 30; // brief pause before re-engaging
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // DIVE-BOMB STATE MACHINE
+            // idle → approach → rising → divebomb → postdive → idle
+            // ══════════════════════════════════════════════════════════════════
+            if (cfg.diveEnabled && botState === 'idle' && botStateCooldown <= 0) {
+                // Enter only when grounded, not near a wall, target nearby
+                if (bot.grounded && !nearLeftWall && !nearRightWall &&
+                    absDx > 60 && absDx < 500 &&
+                    Math.random() < cfg.diveChance) {
+                    botState = 'approach';
+                }
+            }
+
+            if (botState === 'approach') {
+                botKeys[bot.controls.right] = dx > 0;
+                botKeys[bot.controls.left]  = dx < 0;
+
+                if (nearLeftWall || nearRightWall) {
+                    botState = 'idle'; botStateCooldown = 40;
+                }
+                // Tighter jump window: bot is more directly above player at apex
+                else if (absDx < 140 && bot.grounded && botJumpCooldown <= 0) {
+                    botKeys[bot.controls.jump] = true;
+                    botJumpCooldown = 6;
+                    botState = 'rising';
+                }
+            }
+
+            if (botState === 'rising') {
+                botKeys[bot.controls.right] = dx > 0;
+                botKeys[bot.controls.left]  = dx < 0;
+
+                // Double-jump at apex (vy closer to 0) for max height directly above target
+                if (!bot.grounded && bot.jumpCount < bot.maxJumps &&
+                    bot.vy > -2 && botJumpCooldown <= 0) {
+                    botKeys[bot.controls.jump] = true;
+                    botJumpCooldown = 25;
+                    botState = 'divebomb';
+                }
+                if (bot.grounded) { botState = 'postdive'; botStateCooldown = 25; }
+            }
+
+            if (botState === 'divebomb') {
+                botKeys[bot.controls.right] = dx > 0;
+                botKeys[bot.controls.left]  = dx < 0;
+
+                // Wider aerial hit window: body centre + full sword reach so the
+                // attack box actually overlaps even if we're slightly off-centre
+                const AERIAL_HIT_RANGE = cfg.attackRange + 80;
+                if (bot.canCrit && absDx < AERIAL_HIT_RANGE &&
+                    bot.attackCooldown <= 0 && !bot.attacking) {
+                    botKeys[bot.controls.attack] = true;
+                }
+
+                if (bot.grounded) {
+                    botState = 'postdive';
+                    botStateCooldown = botDifficulty === 'hard' ? 8 :
+                                       botDifficulty === 'medium' ? 25 : 50;
+                }
+            }
+
+            if (botState === 'postdive') {
+                // Hard bot: immediately chase and follow-up hit
+                if (botDifficulty === 'hard') {
+                    botKeys[bot.controls.right] = dx > 0;
+                    botKeys[bot.controls.left]  = dx < 0;
+                    if (absDx < cfg.attackRange && bot.attackCooldown <= 0 &&
+                        !bot.attacking && botAttackDelay <= 0 && facingTarget) {
+                        botKeys[bot.controls.attack] = true;
+                        botAttackDelay = cfg.attackDelay;
                     }
                 } else {
-                    botAttackDelay--;
+                    // Others just back off briefly
+                    botKeys[bot.controls.right] = dx < 0;
+                    botKeys[bot.controls.left]  = dx > 0;
+                }
+                if (botStateCooldown <= 0) { botState = 'idle'; }
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // IDLE / GROUND BEHAVIOUR
+            // ══════════════════════════════════════════════════════════════════
+            if (botState === 'idle') {
+                // Determine safe movement direction accounting for walls
+                // If moving toward the player would push us into a wall, don't do it
+                const wouldCornerSelf = (dx > 0 && nearRightWall) || (dx < 0 && nearLeftWall);
+
+                if (!wouldCornerSelf) {
+                    if (absDx > cfg.retreatDist) {
+                        if (Math.random() < cfg.aggressionFactor) {
+                            botKeys[bot.controls.right] = dx > 0;
+                            botKeys[bot.controls.left]  = dx < 0;
+                        }
+                    } else if (absDx < cfg.retreatDist * 0.55) {
+                        // Too close – back up; pick direction that moves away from wall too
+                        const backDir = dx > 0 ? -1 : 1;
+                        botKeys[bot.controls.right] = backDir > 0;
+                        botKeys[bot.controls.left]  = backDir < 0;
+                    }
+                } else {
+                    // Would corner self – hold position or drift away from wall
+                    const safeDir = nearLeftWall ? 1 : -1;
+                    if (absDx < cfg.retreatDist * 1.2) {
+                        // Actively slide away from wall while staying engaged
+                        botKeys[bot.controls.right] = safeDir > 0;
+                        botKeys[bot.controls.left]  = safeDir < 0;
+                    }
+                    // else: hold — don't chase into the wall
+                }
+
+                // ── Random hop for mobility ──────────────────────────────────
+                if (bot.grounded && botJumpCooldown <= 0 && Math.random() < cfg.jumpChance) {
+                    // Don't random-jump toward a wall
+                    const jumpOk = !(nearLeftWall && dx < 0) && !(nearRightWall && dx > 0);
+                    if (jumpOk) {
+                        botKeys[bot.controls.jump] = true;
+                        botJumpCooldown = 90;
+                    }
+                }
+
+                // ── Ground attack ────────────────────────────────────────────
+                if (absDx < cfg.attackRange && bot.attackCooldown <= 0 &&
+                    !bot.attacking && botAttackDelay <= 0) {
+                    if (facingTarget) {
+                        botKeys[bot.controls.attack] = true;
+                        botAttackDelay = cfg.attackDelay + Math.floor(Math.random() * 10);
+                    }
+                }
+
+                // Hard bot: attack during any falling moment if in extended range
+                if (botDifficulty === 'hard' && !bot.grounded &&
+                    bot.canCrit && absDx < cfg.attackRange + 80 &&
+                    bot.attackCooldown <= 0 && !bot.attacking) {
+                    botKeys[bot.controls.attack] = true;
                 }
             }
 
@@ -1192,6 +1392,8 @@
             floatingTexts.length = particles.length = 0;
             screenShake = 0; lastGameTick = 0;
             botAttackDelay = 0; botJumpCooldown = 0;
+            botState = 'idle'; botStateCooldown = 0;
+            botCornerTimer = 0; botEscapeDir = 0;
 
             camera.x = WORLD_WIDTH / 2; camera.y = WORLD_HEIGHT / 2; camera.zoom = 1;
 
@@ -1230,6 +1432,8 @@
             floatingTexts.length = particles.length = 0;
             screenShake = 0; lastGameTick = 0;
             botAttackDelay = 0; botJumpCooldown = 0;
+            botState = 'idle'; botStateCooldown = 0;
+            botCornerTimer = 0; botEscapeDir = 0;
             camera.x = WORLD_WIDTH / 2; camera.y = WORLD_HEIGHT / 2; camera.zoom = 1;
             gameOver = gameStarted = false;
             rematchReady = opponentRematchReady = false;
@@ -1402,6 +1606,8 @@
                     // In bot mode: immediately reset and replay
                     player1Wins = 0; player2Wins = 0;
                     botAttackDelay = 0; botJumpCooldown = 0;
+                    botState = 'idle'; botStateCooldown = 0;
+                    botCornerTimer = 0; botEscapeDir = 0;
                     document.getElementById('overlay').classList.remove('active');
                     document.querySelector('.button-group-overlay').classList.remove('active');
                     resetGameState();
